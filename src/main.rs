@@ -4,19 +4,30 @@
 // Feel free to delete this line.
 #![allow(clippy::too_many_arguments, clippy::type_complexity)]
 
+mod battle_screen;
+mod main_menu;
+
+use battle_screen::BattleScreenPlugin;
 use bevy::prelude::*;
+use main_menu::MainMenuPlugin;
 
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
+        .add_state::<AppState>()
         .add_startup_system(setup)
+        .add_plugin(MainMenuPlugin)
+        .add_plugin(BattleScreenPlugin)
         .run();
 }
 
-fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
+#[derive(States, PartialEq, Eq, Debug, Clone, Hash, Default)]
+pub enum AppState {
+    #[default]
+    MainMenu,
+    Battle,
+}
+
+fn setup(mut commands: Commands) {
     commands.spawn(Camera2dBundle::default());
-    commands.spawn(SpriteBundle {
-        texture: asset_server.load("icon.png"),
-        ..Default::default()
-    });
 }
