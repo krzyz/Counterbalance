@@ -3,13 +3,6 @@
 version = 3
 
 [[package]]
-name = "Counterbalance"
-version = "0.1.0"
-dependencies = [
- "bevy",
-]
-
-[[package]]
 name = "ab_glyph"
 version = "0.2.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1233,6 +1226,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f034b2258e6c4ade2f73bf87b21047567fb913ee9550837c2316d139b0262b24"
 dependencies = [
  "bindgen",
+]
+
+[[package]]
+name = "counterbalance"
+version = "0.1.0"
+dependencies = [
+ "bevy",
 ]
 
 [[package]]
