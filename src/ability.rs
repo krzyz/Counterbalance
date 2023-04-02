@@ -12,7 +12,6 @@ pub struct AbilityPlugin;
 impl Plugin for AbilityPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<AbilityCastEvent>()
-            .add_system(setup_debug.in_schedule(OnEnter(AppState::Battle)))
             .add_system(debug)
             .add_system(cast_ability.in_set(OnUpdate(AppState::Battle)));
     }
@@ -27,13 +26,14 @@ pub struct AbilityCastEvent {
 
 #[derive(Debug, Clone)]
 pub struct Ability {
-    typ: AbilityType,
-    potency: i32,
-    side_effect: Option<Box<Ability>>,
+    pub name: String,
+    pub typ: AbilityType,
+    pub potency: i32,
+    pub side_effect: Option<Box<Ability>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum AbilityType {
+pub enum AbilityType {
     ChangeAttribute(AttributeType),
 }
 
@@ -58,69 +58,27 @@ fn debug(
     }
 }
 
-fn setup_debug(mut commands: Commands, asset_server: Res<AssetServer>) {
-    commands.spawn(CharacterBundle {
-        name: CharacterName("player".to_string()),
-        category: CharacterCategory::Human,
-        abilities: Abilities(vec![Ability {
-            typ: AbilityType::ChangeAttribute(AttributeType::HitPoints),
-            potency: 5,
-            side_effect: None,
-        }]),
-        attributes: Attributes(vec![Attribute {
-            typ: AttributeType::HitPoints,
-            class: AttributeClass::Gauge {
-                value: 50,
-                min: 0,
-                max: 50,
-            },
-        }]),
-        group: Group::Player,
-        sprite: SpriteBundle {
-            transform: Transform {
-                translation: Vec3::new(-20.0, 20.0, 0.0),
-                ..default()
-            },
-            texture: asset_server.load("images/human.png"),
-            ..default()
-        },
-    });
-
-    commands.spawn(CharacterBundle {
-        name: CharacterName("fungus".to_string()),
-        category: CharacterCategory::Fungi,
-        abilities: Abilities(vec![Ability {
-            typ: AbilityType::ChangeAttribute(AttributeType::HitPoints),
-            potency: 5,
-            side_effect: None,
-        }]),
-        attributes: Attributes(vec![Attribute {
-            typ: AttributeType::HitPoints,
-            class: AttributeClass::Gauge {
-                value: 50,
-                min: 0,
-                max: 50,
-            },
-        }]),
-        group: Group::Enemy,
-        sprite: SpriteBundle {
-            transform: Transform {
-                translation: Vec3::new(320.0, 20.0, 0.0),
-                ..default()
-            },
-            texture: asset_server.load("images/fungus.png"),
-            ..default()
-        },
-    });
-}
-
 fn cast_ability(
     mut ev_ability: EventReader<AbilityCastEvent>,
     mut ev_battle_log: EventWriter<BattleLogEvent>,
-    mut query: Query<(Entity, &CharacterCategory, &mut Attributes)>,
+    mut set: ParamSet<(
+        Query<(Entity, &CharacterName, &mut Attributes)>,
+        Query<(Entity, &CharacterName, &CharacterCategory, &mut Attributes)>,
+    )>,
 ) {
     for ability_cast in ev_ability.iter() {
-        for (entity, _category, mut attributes) in query.iter_mut() {
+        let caster_name = {
+            let mut caster_name: Option<String> = None;
+            for (entity, name, mut _attributes) in set.p0().iter() {
+                if ability_cast.by == entity {
+                    caster_name = Some(name.0.clone());
+                    break;
+                }
+            }
+            caster_name.expect("Missing caster entity")
+        };
+
+        for (entity, name, _category, mut attributes) in set.p1().iter_mut() {
             if ability_cast.on.contains(&entity) {
                 match ability_cast.ability.typ {
                     AbilityType::ChangeAttribute(attribute_type) => {
@@ -136,7 +94,10 @@ fn cast_ability(
                                 AttributeClass::Gauge { value, .. } => {
                                     *value -= ability_cast.ability.potency;
                                     ev_battle_log.send(BattleLogEvent {
-                                        message: format!("Hp removed to: {}", *value),
+                                        message: format!(
+                                            "{caster_name} cast {} on {}. Hp removed to: {}",
+                                            ability_cast.ability.name, name.0, *value
+                                        ),
                                     });
                                 }
                             }
