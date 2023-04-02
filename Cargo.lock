@@ -954,6 +954,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "bevycheck"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "35eff4e62ba08efdfa824e835bd7d33875d3f9871dab5c41a8d1c9ed374e89af"
+dependencies = [
+ "quote",
+ "syn 1.0.109",
+]
+
+[[package]]
 name = "bindgen"
 version = "0.64.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1233,6 +1243,7 @@ name = "counterbalance"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "bevycheck",
 ]
 
 [[package]]

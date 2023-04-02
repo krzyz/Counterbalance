@@ -4,9 +4,12 @@
 // Feel free to delete this line.
 #![allow(clippy::too_many_arguments, clippy::type_complexity)]
 
+mod ability;
 mod battle_screen;
+mod character;
 mod main_menu;
 
+use ability::AbilityPlugin;
 use battle_screen::BattleScreenPlugin;
 use bevy::prelude::*;
 use main_menu::MainMenuPlugin;
@@ -18,6 +21,7 @@ fn main() {
         .add_startup_system(setup)
         .add_plugin(MainMenuPlugin)
         .add_plugin(BattleScreenPlugin)
+        .add_plugin(AbilityPlugin)
         .run();
 }
 
