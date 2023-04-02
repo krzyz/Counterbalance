@@ -2,8 +2,7 @@ use bevy::prelude::*;
 
 use crate::battle_screen::BattleLogEvent;
 use crate::character::{
-    Abilities, Attribute, AttributeClass, AttributeType, Attributes, CharacterBundle,
-    CharacterCategory, CharacterName, Group,
+    AttributeClass, AttributeType, Attributes, CharacterCategory, CharacterName,
 };
 use crate::AppState;
 
@@ -12,16 +11,15 @@ pub struct AbilityPlugin;
 impl Plugin for AbilityPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<AbilityCastEvent>()
-            .add_system(debug)
             .add_system(cast_ability.in_set(OnUpdate(AppState::Battle)));
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct AbilityCastEvent {
-    ability: Ability,
-    by: Entity,
-    on: Vec<Entity>,
+    pub ability: Ability,
+    pub by: Entity,
+    pub on: Vec<Entity>,
 }
 
 #[derive(Debug, Clone)]
@@ -35,27 +33,6 @@ pub struct Ability {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AbilityType {
     ChangeAttribute(AttributeType),
-}
-
-fn debug(
-    buttons: Res<Input<MouseButton>>,
-    mut ev_ability: EventWriter<AbilityCastEvent>,
-    query: Query<(Entity, &Abilities, &Group)>,
-    query_2: Query<(Entity, &Group)>,
-) {
-    if buttons.just_pressed(MouseButton::Left) {
-        for (entity, abilities, group) in query.iter() {
-            for (entity2, group2) in query_2.iter() {
-                if let (Group::Player, Group::Enemy) = (group, group2) {
-                    ev_ability.send(AbilityCastEvent {
-                        ability: abilities.0[0].clone(),
-                        by: entity,
-                        on: vec![entity2],
-                    })
-                }
-            }
-        }
-    }
 }
 
 fn cast_ability(

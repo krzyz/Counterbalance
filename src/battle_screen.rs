@@ -1,8 +1,12 @@
 use crate::{
+    ability::AbilityCastEvent,
     character::{spawn_character, Abilities, CharacterCategory, Group},
     AppState,
 };
 use bevy::prelude::*;
+
+const NORMAL_ABILITY_BUTTON: Color = Color::rgb(0.15, 0.15, 0.15);
+const HOVERED_ABILITY_BUTTON: Color = Color::rgb(0.25, 0.25, 0.25);
 
 pub struct BattleScreenPlugin;
 
@@ -75,9 +79,55 @@ fn update_battle_log(
     }
 }
 
-fn choose_action(mut interaction_query: Query<&Interaction, (Changed<Interaction>, With<Button>)>) {
-    for interaction in &mut interaction_query {
-        if let Interaction::Clicked = *interaction {}
+#[derive(Component)]
+struct AbilityButton {
+    ability_name: String,
+}
+
+#[derive(Resource)]
+struct TemporaryTargetResource {
+    target: Entity,
+}
+
+fn choose_action(
+    res_turn: Res<BattleTurn>,
+    res_target: Res<TemporaryTargetResource>,
+    mut ev_ability: EventWriter<AbilityCastEvent>,
+    mut interaction_query: Query<
+        (&Interaction, &mut BackgroundColor, &AbilityButton),
+        (Changed<Interaction>, With<Button>),
+    >,
+    query_abilities: Query<(Entity, &Abilities), Without<Button>>,
+) {
+    for (interaction, mut color, ability_button) in &mut interaction_query {
+        match *interaction {
+            Interaction::Hovered => {
+                *color = HOVERED_ABILITY_BUTTON.into();
+            }
+            Interaction::Clicked => {
+                let abilities = query_abilities
+                    .iter()
+                    .find_map(|(entity, abilities)| (entity == res_turn.turn).then_some(abilities))
+                    .expect("Missing entity whose turn it is now!");
+
+                let chosen_ability = abilities
+                    .0
+                    .iter()
+                    .find(|ability| ability_button.ability_name == ability.name)
+                    .expect("Ability chosen can't be found for the current active entity");
+
+                ev_ability.send(AbilityCastEvent {
+                    ability: chosen_ability.clone(),
+                    by: res_turn.turn,
+                    on: vec![res_target.target],
+                });
+
+                break;
+            }
+            Interaction::None => {
+                *color = NORMAL_ABILITY_BUTTON.into();
+            }
+        }
     }
 }
 
@@ -104,20 +154,37 @@ fn setup_available_actions(
             .iter()
             .map(|ability| {
                 commands
-                    .spawn(
-                        TextBundle::from_section(
-                            ability.name.clone(),
-                            TextStyle {
-                                font: asset_server.load("fonts/FiraSans-Medium.ttf"),
-                                font_size: 30.0,
-                                color: Color::WHITE,
-                            },
-                        )
-                        .with_style(Style {
-                            margin: UiRect::all(Val::Px(5.0)),
+                    .spawn(ButtonBundle {
+                        style: Style {
+                            size: Size::new(Val::Px(250.0), Val::Px(65.0)),
+                            // horizontally center child text
+                            justify_content: JustifyContent::Center,
+                            // vertically center child text
+                            align_items: AlignItems::Center,
                             ..default()
-                        }),
-                    )
+                        },
+                        background_color: NORMAL_ABILITY_BUTTON.into(),
+                        ..default()
+                    })
+                    .insert(AbilityButton {
+                        ability_name: ability.name.clone(),
+                    })
+                    .with_children(|parent| {
+                        parent.spawn(
+                            TextBundle::from_section(
+                                ability.name.clone(),
+                                TextStyle {
+                                    font: asset_server.load("fonts/FiraSans-Medium.ttf"),
+                                    font_size: 30.0,
+                                    color: Color::WHITE,
+                                },
+                            )
+                            .with_style(Style {
+                                margin: UiRect::all(Val::Px(5.0)),
+                                ..default()
+                            }),
+                        );
+                    })
                     .id()
             })
             .collect::<Vec<_>>();
@@ -137,14 +204,17 @@ pub fn setup_battle(
         CharacterCategory::Human,
         Group::Player,
     );
-    commands.entity(player_character).insert(SpriteBundle {
-        transform: Transform {
-            translation: Vec3::new(-20.0, 20.0, 0.0),
+    commands
+        .entity(player_character)
+        .insert(Battle)
+        .insert(SpriteBundle {
+            transform: Transform {
+                translation: Vec3::new(-20.0, 20.0, 0.0),
+                ..default()
+            },
+            texture: asset_server.load("images/human.png"),
             ..default()
-        },
-        texture: asset_server.load("images/human.png"),
-        ..default()
-    });
+        });
 
     let enemy_character = spawn_character(
         &mut commands,
@@ -153,17 +223,24 @@ pub fn setup_battle(
         Group::Enemy,
     );
 
-    commands.entity(enemy_character).insert(SpriteBundle {
-        transform: Transform {
-            translation: Vec3::new(320.0, 20.0, 0.0),
+    commands
+        .entity(enemy_character)
+        .insert(Battle)
+        .insert(SpriteBundle {
+            transform: Transform {
+                translation: Vec3::new(320.0, 20.0, 0.0),
+                ..default()
+            },
+            texture: asset_server.load("images/fungus.png"),
             ..default()
-        },
-        texture: asset_server.load("images/fungus.png"),
-        ..default()
-    });
+        });
 
     commands.insert_resource(BattleTurn {
         turn: player_character,
+    });
+
+    commands.insert_resource(TemporaryTargetResource {
+        target: enemy_character,
     });
 
     next_state.set(BattleState::AbilityCastingPlayer);
@@ -213,7 +290,7 @@ fn build_right_pane(parent: &mut ChildBuilder, asset_server: &Res<AssetServer>) 
         });
 }
 
-fn build_bottom_pane(parent: &mut ChildBuilder, asset_server: &Res<AssetServer>) {
+fn build_bottom_pane(parent: &mut ChildBuilder) {
     parent
         .spawn(NodeBundle {
             style: Style {
@@ -273,7 +350,7 @@ pub fn setup_battle_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
                         },
                         ..default()
                     });
-                    build_bottom_pane(parent, &asset_server);
+                    build_bottom_pane(parent);
                 });
             build_right_pane(parent, &asset_server);
         });
@@ -281,6 +358,7 @@ pub fn setup_battle_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
 
 pub fn cleanup_battle(mut commands: Commands, query: Query<Entity, With<Battle>>) {
     commands.remove_resource::<BattleLog>();
+    commands.remove_resource::<TemporaryTargetResource>();
 
     for entity in query.iter() {
         commands.entity(entity).despawn_recursive();
