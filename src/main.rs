@@ -12,6 +12,7 @@ mod main_menu;
 use ability::AbilityPlugin;
 use battle_screen::BattleScreenPlugin;
 use bevy::prelude::*;
+use bevy_mod_picking::PickingCameraBundle;
 use main_menu::MainMenuPlugin;
 
 fn main() {
@@ -33,5 +34,7 @@ pub enum AppState {
 }
 
 fn setup(mut commands: Commands) {
-    commands.spawn(Camera2dBundle::default());
+    commands
+        .spawn(Camera2dBundle::default())
+        .insert(PickingCameraBundle::default());
 }

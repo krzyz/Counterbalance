@@ -1,9 +1,12 @@
 use crate::{
-    ability::AbilityCastEvent,
+    ability::{Ability, AbilityCastEvent},
     character::{spawn_character, Abilities, CharacterCategory, Group},
     AppState,
 };
-use bevy::prelude::*;
+use bevy::{prelude::*, sprite::Mesh2dHandle};
+use bevy_mod_picking::{DefaultPickingPlugins, PickableBundle, PickableMesh};
+
+use std::mem;
 
 const NORMAL_ABILITY_BUTTON: Color = Color::rgb(0.15, 0.15, 0.15);
 const HOVERED_ABILITY_BUTTON: Color = Color::rgb(0.25, 0.25, 0.25);
@@ -14,16 +17,19 @@ impl Plugin for BattleScreenPlugin {
     fn build(&self, app: &mut App) {
         app.add_state::<BattleState>()
             .add_event::<BattleLogEvent>()
+            .add_plugins(DefaultPickingPlugins)
             .add_systems(
                 (setup_battle_ui, setup_battle)
                     .chain()
                     .in_schedule(OnEnter(AppState::Battle)),
             )
             .add_system(cleanup_battle.in_schedule(OnExit(AppState::Battle)))
-            .add_system(choose_action.in_set(OnUpdate(BattleState::AbilityCastingPlayer)))
+            .add_system(choose_action.in_set(OnUpdate(BattleState::AbilityChoosingPlayer)))
+            .add_system(choose_target.in_set(OnUpdate(BattleState::AbilityTargeting)))
             .add_system(
-                setup_available_actions.in_schedule(OnEnter(BattleState::AbilityCastingPlayer)),
+                setup_available_actions.in_schedule(OnEnter(BattleState::AbilityChoosingPlayer)),
             )
+            .add_system(resize_meshes_for_sprites.in_set(OnUpdate(AppState::Battle)))
             .add_system(update_battle_log.in_set(OnUpdate(AppState::Battle)));
     }
 }
@@ -33,11 +39,17 @@ pub struct BattleTurn {
     turn: Entity,
 }
 
+#[derive(Resource)]
+pub struct ChosenAbility {
+    ability: Ability,
+}
+
 #[derive(States, PartialEq, Eq, Debug, Clone, Hash, Default)]
 pub enum BattleState {
     #[default]
     BattleInit,
-    AbilityCastingPlayer,
+    AbilityChoosingPlayer,
+    AbilityTargeting,
     AbilityCastingEnemy,
     AbilityResolution,
 }
@@ -84,20 +96,51 @@ struct AbilityButton {
     ability_name: String,
 }
 
-#[derive(Resource)]
-struct TemporaryTargetResource {
-    target: Entity,
+fn choose_target(
+    res_turn: Res<BattleTurn>,
+    res_ability: Res<ChosenAbility>,
+    mut ev_ability: EventWriter<AbilityCastEvent>,
+    interaction_query: Query<
+        (Entity, &Interaction, &Group),
+        (Changed<Interaction>, Without<Button>),
+    >,
+    mut ability_buttons_query: Query<&mut BackgroundColor, (With<AbilityButton>, With<Button>)>,
+    mut next_state: ResMut<NextState<BattleState>>,
+) {
+    for (entity, interaction, group) in interaction_query.iter() {
+        if *group == Group::Enemy {
+            match *interaction {
+                Interaction::Hovered => (),
+                Interaction::Clicked => {
+                    ev_ability.send(AbilityCastEvent {
+                        ability: res_ability.ability.clone(),
+                        by: res_turn.turn,
+                        on: vec![entity],
+                    });
+
+                    for mut color in &mut ability_buttons_query {
+                        *color = NORMAL_ABILITY_BUTTON.into();
+                    }
+
+                    next_state.set(BattleState::AbilityCastingEnemy);
+
+                    break;
+                }
+                Interaction::None => (),
+            }
+        }
+    }
 }
 
 fn choose_action(
+    mut commands: Commands,
     res_turn: Res<BattleTurn>,
-    res_target: Res<TemporaryTargetResource>,
-    mut ev_ability: EventWriter<AbilityCastEvent>,
     mut interaction_query: Query<
         (&Interaction, &mut BackgroundColor, &AbilityButton),
         (Changed<Interaction>, With<Button>),
     >,
     query_abilities: Query<(Entity, &Abilities), Without<Button>>,
+    mut next_state: ResMut<NextState<BattleState>>,
 ) {
     for (interaction, mut color, ability_button) in &mut interaction_query {
         match *interaction {
@@ -116,11 +159,11 @@ fn choose_action(
                     .find(|ability| ability_button.ability_name == ability.name)
                     .expect("Ability chosen can't be found for the current active entity");
 
-                ev_ability.send(AbilityCastEvent {
+                commands.insert_resource(ChosenAbility {
                     ability: chosen_ability.clone(),
-                    by: res_turn.turn,
-                    on: vec![res_target.target],
                 });
+
+                next_state.set(BattleState::AbilityTargeting);
 
                 break;
             }
@@ -196,6 +239,8 @@ fn setup_available_actions(
 pub fn setup_battle(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
+    images: Res<Assets<Image>>,
+    mut meshes: ResMut<Assets<Mesh>>,
     mut next_state: ResMut<NextState<BattleState>>,
 ) {
     let player_character = spawn_character(
@@ -223,27 +268,64 @@ pub fn setup_battle(
         Group::Enemy,
     );
 
+    let enemy_image = asset_server.load("images/fungus.png");
     commands
         .entity(enemy_character)
         .insert(Battle)
-        .insert(SpriteBundle {
-            transform: Transform {
-                translation: Vec3::new(320.0, 20.0, 0.0),
+        .insert((
+            SpriteBundle {
+                transform: Transform {
+                    translation: Vec3::new(320.0, 20.0, 0.0),
+                    ..default()
+                },
+                texture: enemy_image.clone(),
                 ..default()
             },
-            texture: asset_server.load("images/fungus.png"),
-            ..default()
-        });
+            PickableBundle::default(),
+        ))
+        .insert(Mesh2dHandle::from(
+            meshes.add(Mesh::from(shape::Quad::new(
+                images
+                    .get(&enemy_image)
+                    .map(|image| image.size())
+                    .unwrap_or(Vec2::ZERO),
+            ))),
+        ));
 
     commands.insert_resource(BattleTurn {
         turn: player_character,
     });
 
-    commands.insert_resource(TemporaryTargetResource {
-        target: enemy_character,
-    });
+    next_state.set(BattleState::AbilityChoosingPlayer);
+}
 
-    next_state.set(BattleState::AbilityCastingPlayer);
+fn resize_meshes_for_sprites(
+    images: Res<Assets<Image>>,
+    mut ev_image_asset: EventReader<AssetEvent<Image>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut query: Query<(&Handle<Image>, &mut Mesh2dHandle), With<PickableMesh>>,
+) {
+    for ev in ev_image_asset.iter() {
+        match ev {
+            AssetEvent::Created { handle } => {
+                if let Some(mut mesh) = query
+                    .iter_mut()
+                    .find_map(|(q_handle, mesh)| (q_handle == handle).then_some(mesh))
+                {
+                    let size = images
+                        .get(&handle)
+                        .expect("Should have gotten new image, asset event lied")
+                        .size();
+
+                    let new_mesh = meshes.add(Mesh::from(shape::Quad::new(size)));
+                    let old_mesh = mem::replace(&mut mesh.0, new_mesh);
+
+                    meshes.remove(old_mesh);
+                }
+            }
+            _ => (),
+        }
+    }
 }
 
 fn build_right_pane(parent: &mut ChildBuilder, asset_server: &Res<AssetServer>) {
@@ -358,7 +440,6 @@ pub fn setup_battle_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
 
 pub fn cleanup_battle(mut commands: Commands, query: Query<Entity, With<Battle>>) {
     commands.remove_resource::<BattleLog>();
-    commands.remove_resource::<TemporaryTargetResource>();
 
     for entity in query.iter() {
         commands.entity(entity).despawn_recursive();

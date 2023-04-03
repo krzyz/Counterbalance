@@ -7,6 +7,7 @@ license = "MIT OR Apache-2.0"
 [dependencies]
 bevy = "0.10"
 bevycheck = "0.5.2"
+bevy_mod_picking = "0.12"
 
 # Enable a small amount of optimization in debug mode
 [profile.dev]

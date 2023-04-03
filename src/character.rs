@@ -2,7 +2,7 @@ use bevy::prelude::*;
 
 use crate::ability::{Ability, AbilityType};
 
-#[derive(Component)]
+#[derive(Component, PartialEq, Eq)]
 pub enum Group {
     Player,
     Enemy,
