@@ -1,9 +1,7 @@
 use bevy::prelude::*;
 
 use crate::battle_screen::BattleLogEvent;
-use crate::character::{
-    AttributeClass, AttributeType, Attributes, CharacterCategory, CharacterName,
-};
+use crate::character::{Attribute, AttributeType, Attributes, CharacterCategory, CharacterName};
 use crate::AppState;
 
 pub struct AbilityPlugin;
@@ -59,16 +57,12 @@ fn cast_ability(
             if ability_cast.on.contains(&entity) {
                 match ability_cast.ability.typ {
                     AbilityType::ChangeAttribute(attribute_type) => {
-                        if let Some(attribute) = attributes
-                            .0
-                            .iter_mut()
-                            .find(|attr| attr.typ == attribute_type)
-                        {
-                            match &mut attribute.class {
-                                AttributeClass::Value(v) => {
+                        if let Some(attribute) = attributes.0.get_mut(&attribute_type) {
+                            match attribute {
+                                Attribute::Value(v) => {
                                     *v -= ability_cast.ability.potency;
                                 }
-                                AttributeClass::Gauge { value, .. } => {
+                                Attribute::Gauge { value, .. } => {
                                     *value -= ability_cast.ability.potency;
                                     ev_battle_log.send(BattleLogEvent {
                                         message: format!(

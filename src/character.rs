@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{prelude::*, utils::HashMap};
 
 use crate::ability::{Ability, AbilityType};
 
@@ -28,12 +28,12 @@ pub enum CharacterCategory {
 }
 
 #[derive(Component)]
-pub struct Abilities(pub Vec<Ability>);
+pub struct Abilities(pub HashMap<String, Ability>);
 
 #[derive(Component)]
-pub struct Attributes(pub Vec<Attribute>);
+pub struct Attributes(pub HashMap<AttributeType, Attribute>);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum AttributeType {
     HitPoints,
     //Stamina,
@@ -41,15 +41,9 @@ pub enum AttributeType {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum AttributeClass {
+pub enum Attribute {
     Value(i32),
     Gauge { value: i32, min: i32, max: i32 },
-}
-
-#[derive(Component, Debug, Clone, Copy)]
-pub struct Attribute {
-    pub typ: AttributeType,
-    pub class: AttributeClass,
 }
 
 pub fn spawn_character(
@@ -62,20 +56,31 @@ pub fn spawn_character(
         .spawn(CharacterBundle {
             name: CharacterName(name.to_string()),
             category,
-            abilities: Abilities(vec![Ability {
-                name: "hit".to_string(),
-                typ: AbilityType::ChangeAttribute(AttributeType::HitPoints),
-                potency: 5,
-                side_effect: None,
-            }]),
-            attributes: Attributes(vec![Attribute {
-                typ: AttributeType::HitPoints,
-                class: AttributeClass::Gauge {
-                    value: 50,
-                    min: 0,
-                    max: 50,
-                },
-            }]),
+            abilities: Abilities(
+                [(
+                    "hit".to_string(),
+                    Ability {
+                        name: "hit".to_string(),
+                        typ: AbilityType::ChangeAttribute(AttributeType::HitPoints),
+                        potency: 5,
+                        side_effect: None,
+                    },
+                )]
+                .into_iter()
+                .collect(),
+            ),
+            attributes: Attributes(
+                [(
+                    AttributeType::HitPoints,
+                    Attribute::Gauge {
+                        value: 50,
+                        min: 0,
+                        max: 50,
+                    },
+                )]
+                .into_iter()
+                .collect(),
+            ),
             group,
         })
         .id()
