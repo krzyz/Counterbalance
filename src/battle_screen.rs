@@ -1,12 +1,14 @@
 use crate::{
     ability::{Ability, AbilityCastEvent},
     character::{spawn_character, Abilities, CharacterCategory, Group},
+    utils::bar::{spawn_bar, Bar, BarPlugin},
     AppState,
 };
-use bevy::{prelude::*, sprite::Mesh2dHandle};
+use bevy::{ecs::query::ReadOnlyWorldQuery, prelude::*, sprite::Mesh2dHandle};
 use bevy_mod_picking::{DefaultPickingPlugins, PickableBundle, PickableMesh};
+use rand::seq::IteratorRandom;
 
-use std::mem;
+use std::{collections::VecDeque, mem};
 
 const NORMAL_ABILITY_BUTTON: Color = Color::rgb(0.15, 0.15, 0.15);
 const HOVERED_ABILITY_BUTTON: Color = Color::rgb(0.25, 0.25, 0.25);
@@ -18,6 +20,7 @@ impl Plugin for BattleScreenPlugin {
         app.add_state::<BattleState>()
             .add_event::<BattleLogEvent>()
             .add_plugins(DefaultPickingPlugins)
+            .add_plugin(BarPlugin)
             .add_systems(
                 (setup_battle_ui, setup_battle)
                     .chain()
@@ -29,14 +32,27 @@ impl Plugin for BattleScreenPlugin {
             .add_system(
                 setup_available_actions.in_schedule(OnEnter(BattleState::AbilityChoosingPlayer)),
             )
-            .add_system(resize_meshes_for_sprites.in_set(OnUpdate(AppState::Battle)))
-            .add_system(update_battle_log.in_set(OnUpdate(AppState::Battle)));
+            .add_system(handle_enemy_turn.in_schedule(OnEnter(BattleState::AbilityCastingEnemy)))
+            .add_systems(
+                (
+                    resize_meshes_for_sprites,
+                    update_battle_log,
+                    update_top_text,
+                )
+                    .in_set(OnUpdate(AppState::Battle)),
+            );
     }
 }
 
 #[derive(Resource)]
-pub struct BattleTurn {
-    turn: Entity,
+pub struct BattleQueue {
+    queue: VecDeque<Entity>,
+}
+
+impl BattleQueue {
+    fn get_current(&self) -> Entity {
+        *self.queue.get(0).expect("Error: turn queue is empty!")
+    }
 }
 
 #[derive(Resource)]
@@ -60,6 +76,9 @@ pub struct Battle;
 #[derive(Component)]
 pub struct BattleLogText;
 
+#[derive(Component)]
+struct TopText;
+
 #[derive(Resource)]
 pub struct BattleLog {
     messages: Vec<String>,
@@ -67,6 +86,19 @@ pub struct BattleLog {
 
 pub struct BattleLogEvent {
     pub message: String,
+}
+
+fn get_abilities<'q, 'w, 's, F>(
+    entity: Entity,
+    query: &'q Query<'w, 's, (Entity, &Abilities), F>,
+) -> &'q Abilities
+where
+    F: ReadOnlyWorldQuery,
+{
+    query
+        .iter()
+        .find_map(|(q_entity, abilities)| (q_entity == entity).then_some(abilities))
+        .expect("Missing entity whose turn it is now!")
 }
 
 fn update_battle_log(
@@ -96,37 +128,104 @@ struct AbilityButton {
     ability_name: String,
 }
 
-fn choose_target(
-    res_turn: Res<BattleTurn>,
-    res_ability: Res<ChosenAbility>,
+fn handle_enemy_turn(
+    mut res_queue: ResMut<BattleQueue>,
+    mut set: ParamSet<(Query<(Entity, &Abilities)>, Query<(Entity, &Group)>)>,
     mut ev_ability: EventWriter<AbilityCastEvent>,
-    interaction_query: Query<
-        (Entity, &Interaction, &Group),
-        (Changed<Interaction>, Without<Button>),
-    >,
-    mut ability_buttons_query: Query<&mut BackgroundColor, (With<AbilityButton>, With<Button>)>,
     mut next_state: ResMut<NextState<BattleState>>,
 ) {
-    for (entity, interaction, group) in interaction_query.iter() {
+    let mut rng = rand::thread_rng();
+
+    let target = set
+        .p1()
+        .iter()
+        .filter_map(|(entity, group)| (*group == Group::Player).then_some(entity))
+        .choose(&mut rng);
+
+    let active_entity = res_queue.get_current();
+
+    if let Some(ability) = get_abilities(active_entity, &set.p0())
+        .0
+        .iter()
+        .choose(&mut rng)
+    {
+        if let Some(target) = target {
+            ev_ability.send(AbilityCastEvent {
+                ability: ability.clone(),
+                by: active_entity,
+                on: vec![target],
+            });
+        }
+    }
+
+    res_queue.queue.rotate_left(1);
+    next_state.set(BattleState::AbilityChoosingPlayer)
+}
+
+fn update_top_text(state: Res<State<BattleState>>, mut query: Query<&mut Text, With<TopText>>) {
+    if state.is_changed() {
+        let update_text = match state.0 {
+            BattleState::BattleInit => "",
+            BattleState::AbilityChoosingPlayer => "Select an ability",
+            BattleState::AbilityTargeting => "Select a target",
+            BattleState::AbilityCastingEnemy => "Enemy's turn",
+            BattleState::AbilityResolution => "Resolving an ability",
+        };
+
+        for mut text in &mut query {
+            if let Some(section) = text.sections.first_mut() {
+                section.value = update_text.into();
+            }
+        }
+    }
+}
+
+fn choose_target(
+    mut commands: Commands,
+    mut res_queue: ResMut<BattleQueue>,
+    res_ability: Res<ChosenAbility>,
+    mut ev_ability: EventWriter<AbilityCastEvent>,
+    mut interaction_query: Query<
+        (Entity, &Interaction, &Group, &mut Sprite),
+        (Changed<Interaction>, (Without<Button>, Without<Bar>)),
+    >,
+    mut ability_buttons_query: Query<&mut BackgroundColor, (With<AbilityButton>, With<Button>)>,
+    mut bar_query: Query<&mut Bar, Without<Button>>,
+    mut next_state: ResMut<NextState<BattleState>>,
+) {
+    for (entity, interaction, group, mut sprite) in interaction_query.iter_mut() {
         if *group == Group::Enemy {
             match *interaction {
-                Interaction::Hovered => (),
+                Interaction::Hovered => sprite.color = Color::rgba(0.7, 1.0, 0.7, 1.0),
                 Interaction::Clicked => {
+                    sprite.color = Color::default();
+
                     ev_ability.send(AbilityCastEvent {
                         ability: res_ability.ability.clone(),
-                        by: res_turn.turn,
+                        by: res_queue.get_current(),
                         on: vec![entity],
                     });
 
+                    commands.remove_resource::<ChosenAbility>();
+
+                    res_queue.queue.rotate_left(1);
+
                     for mut color in &mut ability_buttons_query {
                         *color = NORMAL_ABILITY_BUTTON.into();
+                    }
+
+                    for mut bar in &mut bar_query {
+                        let value = bar.value();
+                        bar.set_value(value - res_ability.ability.potency as f32);
                     }
 
                     next_state.set(BattleState::AbilityCastingEnemy);
 
                     break;
                 }
-                Interaction::None => (),
+                Interaction::None => {
+                    sprite.color = Color::default();
+                }
             }
         }
     }
@@ -134,12 +233,12 @@ fn choose_target(
 
 fn choose_action(
     mut commands: Commands,
-    res_turn: Res<BattleTurn>,
+    res_queue: Res<BattleQueue>,
     mut interaction_query: Query<
         (&Interaction, &mut BackgroundColor, &AbilityButton),
         (Changed<Interaction>, With<Button>),
     >,
-    query_abilities: Query<(Entity, &Abilities), Without<Button>>,
+    abilities_query: Query<(Entity, &Abilities), Without<Button>>,
     mut next_state: ResMut<NextState<BattleState>>,
 ) {
     for (interaction, mut color, ability_button) in &mut interaction_query {
@@ -148,10 +247,7 @@ fn choose_action(
                 *color = HOVERED_ABILITY_BUTTON.into();
             }
             Interaction::Clicked => {
-                let abilities = query_abilities
-                    .iter()
-                    .find_map(|(entity, abilities)| (entity == res_turn.turn).then_some(abilities))
-                    .expect("Missing entity whose turn it is now!");
+                let abilities = get_abilities(res_queue.get_current(), &abilities_query);
 
                 let chosen_ability = abilities
                     .0
@@ -179,15 +275,14 @@ struct AvailableActionsNode;
 
 fn setup_available_actions(
     mut commands: Commands,
-    res_turn: Res<BattleTurn>,
+    res_queue: Res<BattleQueue>,
     asset_server: Res<AssetServer>,
     mut query_node: Query<Entity, With<AvailableActionsNode>>,
     query_abilities: Query<(Entity, &Abilities), Without<AvailableActionsNode>>,
 ) {
-    let abilities = query_abilities
-        .iter()
-        .find_map(|(entity, abilities)| (entity == res_turn.turn).then_some(abilities))
-        .expect("Missing entity whose turn it is now!");
+    let caster = res_queue.get_current();
+
+    let abilities = get_abilities(caster, &query_abilities);
 
     for entity in query_node.iter_mut() {
         commands.entity(entity).despawn_descendants();
@@ -261,6 +356,9 @@ pub fn setup_battle(
             ..default()
         });
 
+    let bar = spawn_bar(&mut commands);
+    commands.entity(bar).insert(Bar::new(0.0, 50.0, 50.0));
+
     let enemy_character = spawn_character(
         &mut commands,
         "fungus",
@@ -292,8 +390,8 @@ pub fn setup_battle(
             ))),
         ));
 
-    commands.insert_resource(BattleTurn {
-        turn: player_character,
+    commands.insert_resource(BattleQueue {
+        queue: [player_character, enemy_character].into(),
     });
 
     next_state.set(BattleState::AbilityChoosingPlayer);
@@ -425,13 +523,26 @@ pub fn setup_battle_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
                     ..default()
                 })
                 .with_children(|parent| {
-                    parent.spawn(NodeBundle {
-                        style: Style {
-                            size: Size::AUTO,
+                    parent
+                        .spawn(NodeBundle {
+                            style: Style {
+                                size: Size::AUTO,
+                                ..default()
+                            },
                             ..default()
-                        },
-                        ..default()
-                    });
+                        })
+                        .with_children(|parent| {
+                            parent
+                                .spawn(TextBundle::from_section(
+                                    "",
+                                    TextStyle {
+                                        font: asset_server.load("fonts/FiraSans-Medium.ttf"),
+                                        font_size: 50.0,
+                                        color: Color::WHITE,
+                                    },
+                                ))
+                                .insert(TopText);
+                        });
                     build_bottom_pane(parent);
                 });
             build_right_pane(parent, &asset_server);

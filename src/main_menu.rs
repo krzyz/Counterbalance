@@ -3,7 +3,6 @@ use bevy::prelude::*;
 
 const NORMAL_BUTTON: Color = Color::rgb(0.15, 0.15, 0.15);
 const HOVERED_BUTTON: Color = Color::rgb(0.25, 0.25, 0.25);
-const PRESSED_BUTTON: Color = Color::rgb(0.35, 0.75, 0.35);
 
 pub struct MainMenuPlugin;
 
@@ -91,15 +90,13 @@ pub fn main_menu_button_looks(
 ) {
     for (interaction, mut color) in &mut interaction_query {
         match *interaction {
-            Interaction::Clicked => {
-                *color = PRESSED_BUTTON.into();
-            }
             Interaction::Hovered => {
                 *color = HOVERED_BUTTON.into();
             }
             Interaction::None => {
                 *color = NORMAL_BUTTON.into();
             }
+            _ => (),
         }
     }
 }

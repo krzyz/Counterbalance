@@ -72,7 +72,7 @@ fn cast_ability(
                                     *value -= ability_cast.ability.potency;
                                     ev_battle_log.send(BattleLogEvent {
                                         message: format!(
-                                            "{caster_name} cast {} on {}. Hp removed to: {}",
+                                            "{caster_name} used {} on {}. Hp removed to: {}",
                                             ability_cast.ability.name, name.0, *value
                                         ),
                                     });

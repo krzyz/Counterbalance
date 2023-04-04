@@ -8,18 +8,22 @@ mod ability;
 mod battle_screen;
 mod character;
 mod main_menu;
+mod utils;
 
 use ability::AbilityPlugin;
 use battle_screen::BattleScreenPlugin;
 use bevy::prelude::*;
 use bevy_mod_picking::PickingCameraBundle;
+use bevy_prototype_lyon::prelude::*;
 use main_menu::MainMenuPlugin;
 
 fn main() {
     App::new()
+        .insert_resource(Msaa::Sample4)
         .add_plugins(DefaultPlugins)
         .add_state::<AppState>()
         .add_startup_system(setup)
+        .add_plugin(ShapePlugin)
         .add_plugin(MainMenuPlugin)
         .add_plugin(BattleScreenPlugin)
         .add_plugin(AbilityPlugin)
