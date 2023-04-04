@@ -5,13 +5,13 @@
 #![allow(clippy::too_many_arguments, clippy::type_complexity)]
 
 mod ability;
-mod battle_screen;
+mod battle;
 mod character;
 mod main_menu;
 mod utils;
 
 use ability::AbilityPlugin;
-use battle_screen::BattleScreenPlugin;
+use battle::battle_plugin::BattlePlugin;
 use bevy::prelude::*;
 use bevy_mod_picking::PickingCameraBundle;
 use bevy_prototype_lyon::prelude::*;
@@ -25,7 +25,7 @@ fn main() {
         .add_startup_system(setup)
         .add_plugin(ShapePlugin)
         .add_plugin(MainMenuPlugin)
-        .add_plugin(BattleScreenPlugin)
+        .add_plugin(BattlePlugin)
         .add_plugin(AbilityPlugin)
         .run();
 }

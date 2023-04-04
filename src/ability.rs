@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::battle_screen::BattleLogEvent;
+use crate::battle::battle_log::BattleLogEvent;
 use crate::character::{Attribute, AttributeType, Attributes, CharacterCategory, CharacterName};
 use crate::AppState;
 
