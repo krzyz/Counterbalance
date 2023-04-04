@@ -1,8 +1,5 @@
-use crate::AppState;
+use crate::{AppState, HOVERED_BUTTON, NORMAL_BUTTON};
 use bevy::prelude::*;
-
-const NORMAL_BUTTON: Color = Color::rgb(0.15, 0.15, 0.15);
-const HOVERED_BUTTON: Color = Color::rgb(0.25, 0.25, 0.25);
 
 pub struct MainMenuPlugin;
 

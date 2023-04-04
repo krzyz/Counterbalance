@@ -1,8 +1,10 @@
 use crate::{
     ability::{Ability, AbilityCastEvent},
-    character::{spawn_character, Abilities, AttributeType, CharacterCategory, Group},
+    character::{
+        get_hit_ability, spawn_character, Abilities, AttributeType, CharacterCategory, Group,
+    },
     utils::bar::{Bar, BarPlugin},
-    AppState,
+    AppState, HOVERED_BUTTON, NORMAL_BUTTON,
 };
 use bevy::{prelude::*, sprite::Mesh2dHandle};
 use bevy_mod_picking::{DefaultPickingPlugins, PickableBundle, PickableMesh};
@@ -11,12 +13,11 @@ use rand::seq::IteratorRandom;
 use std::{collections::VecDeque, mem};
 
 use super::{
+    battle_lifecycle::{handle_lifecycle_event, Alive, BattleLifecycleEvent},
     battle_log::{cleanup_battle_log, setup_battle_log, update_battle_log, BattleLogEvent},
+    battle_resolution::setup_battle_resolution,
     battle_ui::{setup_battle_ui, update_top_text},
 };
-
-const NORMAL_ABILITY_BUTTON: Color = Color::rgb(0.15, 0.15, 0.15);
-const HOVERED_ABILITY_BUTTON: Color = Color::rgb(0.25, 0.25, 0.25);
 
 pub struct BattlePlugin;
 
@@ -24,6 +25,7 @@ impl Plugin for BattlePlugin {
     fn build(&self, app: &mut App) {
         app.add_state::<BattleState>()
             .add_event::<BattleLogEvent>()
+            .add_event::<BattleLifecycleEvent>()
             .add_plugins(DefaultPickingPlugins)
             .add_plugin(BarPlugin)
             .add_systems(
@@ -43,9 +45,11 @@ impl Plugin for BattlePlugin {
                     resize_meshes_for_sprites,
                     update_battle_log,
                     update_top_text,
+                    handle_lifecycle_event,
                 )
                     .in_set(OnUpdate(AppState::Battle)),
-            );
+            )
+            .add_system(setup_battle_resolution.in_schedule(OnEnter(BattleState::BattleEnd)));
     }
 }
 
@@ -69,6 +73,7 @@ pub struct ChosenAbility {
 pub enum BattleState {
     #[default]
     BattleInit,
+    BattleEnd,
     AbilityChoosingPlayer,
     AbilityTargeting,
     AbilityCastingEnemy,
@@ -150,7 +155,7 @@ fn choose_target(
                     res_queue.queue.rotate_left(1);
 
                     for mut color in &mut ability_buttons_query {
-                        *color = NORMAL_ABILITY_BUTTON.into();
+                        *color = NORMAL_BUTTON.into();
                     }
 
                     next_state.set(BattleState::AbilityCastingEnemy);
@@ -178,7 +183,7 @@ fn choose_action(
     for (interaction, mut color, ability_button) in &mut interaction_query {
         match *interaction {
             Interaction::Hovered => {
-                *color = HOVERED_ABILITY_BUTTON.into();
+                *color = HOVERED_BUTTON.into();
             }
             Interaction::Clicked => {
                 //let abilities = get_abilities(res_queue.get_current(), &abilities_query);
@@ -200,7 +205,7 @@ fn choose_action(
                 break;
             }
             Interaction::None => {
-                *color = NORMAL_ABILITY_BUTTON.into();
+                *color = NORMAL_BUTTON.into();
             }
         }
     }
@@ -239,7 +244,7 @@ fn setup_available_actions(
                             align_items: AlignItems::Center,
                             ..default()
                         },
-                        background_color: NORMAL_ABILITY_BUTTON.into(),
+                        background_color: NORMAL_BUTTON.into(),
                         ..default()
                     })
                     .insert(AbilityButton {
@@ -281,6 +286,7 @@ pub fn setup_battle(
         "player",
         CharacterCategory::Human,
         Group::Player,
+        get_hit_ability(5),
     );
     commands.entity(player_character).insert((
         Battle,
@@ -293,6 +299,7 @@ pub fn setup_battle(
             ..default()
         },
         Bar::new(AttributeType::HitPoints),
+        Alive,
     ));
 
     let enemy_character = spawn_character(
@@ -300,6 +307,7 @@ pub fn setup_battle(
         "fungus",
         CharacterCategory::Fungi,
         Group::Enemy,
+        get_hit_ability(4),
     );
 
     let enemy_image = asset_server.load("images/fungus.png");
@@ -323,6 +331,7 @@ pub fn setup_battle(
             ))),
         ),
         Bar::new(AttributeType::HitPoints),
+        Alive,
     ));
 
     commands.insert_resource(BattleQueue {

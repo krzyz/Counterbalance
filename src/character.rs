@@ -46,29 +46,27 @@ pub enum Attribute {
     Gauge { value: i32, min: i32, max: i32 },
 }
 
+pub fn get_hit_ability(potency: i32) -> Ability {
+    Ability {
+        name: "hit".to_string(),
+        typ: AbilityType::ChangeAttribute(AttributeType::HitPoints),
+        potency: 5,
+        side_effect: None,
+    }
+}
+
 pub fn spawn_character(
     commands: &mut Commands,
     name: &str,
     category: CharacterCategory,
     group: Group,
+    ability: Ability,
 ) -> Entity {
     commands
         .spawn(CharacterBundle {
             name: CharacterName(name.to_string()),
             category,
-            abilities: Abilities(
-                [(
-                    "hit".to_string(),
-                    Ability {
-                        name: "hit".to_string(),
-                        typ: AbilityType::ChangeAttribute(AttributeType::HitPoints),
-                        potency: 5,
-                        side_effect: None,
-                    },
-                )]
-                .into_iter()
-                .collect(),
-            ),
+            abilities: Abilities([(ability.name.clone(), ability)].into_iter().collect()),
             attributes: Attributes(
                 [(
                     AttributeType::HitPoints,

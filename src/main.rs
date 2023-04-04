@@ -17,6 +17,9 @@ use bevy_mod_picking::PickingCameraBundle;
 use bevy_prototype_lyon::prelude::*;
 use main_menu::MainMenuPlugin;
 
+pub const NORMAL_BUTTON: Color = Color::rgb(0.15, 0.15, 0.15);
+pub const HOVERED_BUTTON: Color = Color::rgb(0.25, 0.25, 0.25);
+
 fn main() {
     App::new()
         .insert_resource(Msaa::Sample4)
@@ -35,6 +38,7 @@ pub enum AppState {
     #[default]
     MainMenu,
     Battle,
+    AbilityChoose,
 }
 
 fn setup(mut commands: Commands) {

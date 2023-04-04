@@ -12,6 +12,7 @@ pub fn update_top_text(state: Res<State<BattleState>>, mut query: Query<&mut Tex
     if state.is_changed() {
         let update_text = match state.0 {
             BattleState::BattleInit => "",
+            BattleState::BattleEnd => "",
             BattleState::AbilityChoosingPlayer => "Select an ability",
             BattleState::AbilityTargeting => "Select a target",
             BattleState::AbilityCastingEnemy => "Enemy's turn",

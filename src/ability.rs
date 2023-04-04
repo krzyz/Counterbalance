@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 
+use crate::battle::battle_lifecycle::BattleLifecycleEvent;
 use crate::battle::battle_log::BattleLogEvent;
 use crate::character::{Attribute, AttributeType, Attributes, CharacterCategory, CharacterName};
 use crate::AppState;
@@ -36,6 +37,7 @@ pub enum AbilityType {
 fn cast_ability(
     mut ev_ability: EventReader<AbilityCastEvent>,
     mut ev_battle_log: EventWriter<BattleLogEvent>,
+    mut ev_lifecycle: EventWriter<BattleLifecycleEvent>,
     mut set: ParamSet<(
         Query<(Entity, &CharacterName, &mut Attributes)>,
         Query<(Entity, &CharacterName, &CharacterCategory, &mut Attributes)>,
@@ -62,14 +64,21 @@ fn cast_ability(
                                 Attribute::Value(v) => {
                                     *v -= ability_cast.ability.potency;
                                 }
-                                Attribute::Gauge { value, .. } => {
-                                    *value -= ability_cast.ability.potency;
+                                Attribute::Gauge { value, min, max } => {
+                                    *value =
+                                        (*value - ability_cast.ability.potency).clamp(*min, *max);
+
                                     ev_battle_log.send(BattleLogEvent {
                                         message: format!(
                                             "{caster_name} used {} on {}. Hp removed to: {}",
                                             ability_cast.ability.name, name.0, *value
                                         ),
                                     });
+
+                                    if attribute_type == AttributeType::HitPoints && *value <= 0 {
+                                        ev_lifecycle
+                                            .send(BattleLifecycleEvent::CharacterDied(entity))
+                                    }
                                 }
                             }
                         }
