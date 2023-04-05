@@ -1,10 +1,8 @@
 use crate::{
     abilities::{Ability, AbilityCastEvent},
-    character::{
-        get_hit_ability, spawn_character, Abilities, AttributeType, CharacterCategory, Group,
-    },
+    character::{Abilities, AttributeType, Group},
     utils::bar::{Bar, BarPlugin},
-    AppState, HOVERED_BUTTON, NORMAL_BUTTON,
+    AppState, GameState, HOVERED_BUTTON, NORMAL_BUTTON,
 };
 use bevy::{prelude::*, sprite::Mesh2dHandle};
 use bevy_mod_picking::{DefaultPickingPlugins, PickableBundle, PickableMesh};
@@ -17,6 +15,7 @@ use super::{
     battle_log::{cleanup_battle_log, setup_battle_log, update_battle_log, BattleLogEvent},
     battle_resolution::{battle_resolution_button_interaction, setup_battle_resolution},
     battle_ui::{setup_battle_ui, update_top_text},
+    enemies::initialize_enemies,
 };
 
 pub struct BattlePlugin;
@@ -29,7 +28,12 @@ impl Plugin for BattlePlugin {
             .add_plugins(DefaultPickingPlugins)
             .add_plugin(BarPlugin)
             .add_systems(
-                (setup_battle_log, setup_battle_ui, setup_battle)
+                (
+                    setup_battle_log,
+                    setup_battle_ui,
+                    initialize_enemies,
+                    setup_battle,
+                )
                     .chain()
                     .in_schedule(OnEnter(AppState::Battle)),
             )
@@ -56,7 +60,7 @@ impl Plugin for BattlePlugin {
     }
 }
 
-#[derive(Resource)]
+#[derive(Resource, Default)]
 pub struct BattleQueue {
     pub queue: VecDeque<Entity>,
 }
@@ -274,97 +278,44 @@ pub fn setup_battle(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     images: Res<Assets<Image>>,
+    game_state: Res<GameState>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut next_state: ResMut<NextState<BattleState>>,
 ) {
-    let player_character = spawn_character(
-        &mut commands,
-        "player",
-        CharacterCategory::Human,
-        Group::Player,
-        get_hit_ability(50),
-    );
-    commands.entity(player_character).insert((
-        Battle,
-        SpriteBundle {
-            transform: Transform {
-                translation: Vec3::new(-300.0, 20.0, 0.0),
-                ..default()
-            },
-            texture: asset_server.load("images/human.png"),
-            ..default()
-        },
-        Bar::new(AttributeType::HitPoints),
-        LifeState::Alive,
-    ));
+    let mut queue = BattleQueue::default();
 
-    let enemy_character = spawn_character(
-        &mut commands,
-        "fungus",
-        CharacterCategory::Fungi,
-        Group::Enemy,
-        get_hit_ability(4),
-    );
+    for (i, character) in game_state.characters.iter().enumerate() {
+        let texture = asset_server.load(character.image_path.clone());
+        let id = commands
+            .spawn((
+                character.bundle.clone(),
+                SpriteBundle {
+                    transform: Transform {
+                        translation: Vec3::new(-300.0 + (200 * i) as f32, 20.0, 0.0),
+                        ..default()
+                    },
+                    texture: texture.clone(),
+                    ..default()
+                },
+                Battle,
+                PickableBundle::default(),
+                Mesh2dHandle::from(
+                    meshes.add(Mesh::from(shape::Quad::new(
+                        images
+                            .get(&texture)
+                            .map(|image| image.size())
+                            .unwrap_or(Vec2::ZERO),
+                    ))),
+                ),
+                Bar::new(AttributeType::HitPoints),
+                LifeState::Alive,
+            ))
+            .id();
 
-    let enemy_character_2 = spawn_character(
-        &mut commands,
-        "fungus",
-        CharacterCategory::Fungi,
-        Group::Enemy,
-        get_hit_ability(6),
-    );
+        queue.queue.push_back(id);
+    }
 
-    let enemy_image = asset_server.load("images/fungus.png");
-
-    commands.entity(enemy_character).insert((
-        Battle,
-        SpriteBundle {
-            transform: Transform {
-                translation: Vec3::new(120.0, 20.0, 0.0),
-                ..default()
-            },
-            texture: enemy_image.clone(),
-            ..default()
-        },
-        PickableBundle::default(),
-        Mesh2dHandle::from(
-            meshes.add(Mesh::from(shape::Quad::new(
-                images
-                    .get(&enemy_image)
-                    .map(|image| image.size())
-                    .unwrap_or(Vec2::ZERO),
-            ))),
-        ),
-        Bar::new(AttributeType::HitPoints),
-        LifeState::Alive,
-    ));
-
-    commands.entity(enemy_character_2).insert((
-        Battle,
-        SpriteBundle {
-            transform: Transform {
-                translation: Vec3::new(320.0, 20.0, 0.0),
-                ..default()
-            },
-            texture: enemy_image.clone(),
-            ..default()
-        },
-        PickableBundle::default(),
-        Mesh2dHandle::from(
-            meshes.add(Mesh::from(shape::Quad::new(
-                images
-                    .get(&enemy_image)
-                    .map(|image| image.size())
-                    .unwrap_or(Vec2::ZERO),
-            ))),
-        ),
-        Bar::new(AttributeType::HitPoints),
-        LifeState::Alive,
-    ));
-
-    commands.insert_resource(BattleQueue {
-        queue: [player_character, enemy_character, enemy_character_2].into(),
-    });
+    commands.insert_resource(queue);
 
     next_state.set(BattleState::AbilityChoosingPlayer);
 }

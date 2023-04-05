@@ -1,3 +1,5 @@
+pub mod choose_ability_screen;
+
 use bevy::prelude::*;
 
 use crate::battle::battle_lifecycle::BattleLifecycleEvent;
@@ -10,7 +12,7 @@ pub struct AbilityPlugin;
 impl Plugin for AbilityPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<AbilityCastEvent>()
-            .add_system(cast_ability.in_set(OnUpdate(AppState::Battle)));
+            .add_system(resolve_ability.in_set(OnUpdate(AppState::Battle)));
     }
 }
 
@@ -34,7 +36,7 @@ pub enum AbilityType {
     ChangeAttribute(AttributeType),
 }
 
-fn cast_ability(
+fn resolve_ability(
     mut ev_ability: EventReader<AbilityCastEvent>,
     mut ev_battle_log: EventWriter<BattleLogEvent>,
     mut ev_lifecycle: EventWriter<BattleLifecycleEvent>,
