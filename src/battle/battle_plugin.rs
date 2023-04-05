@@ -1,5 +1,5 @@
 use crate::{
-    ability::{Ability, AbilityCastEvent},
+    abilities::{Ability, AbilityCastEvent},
     character::{
         get_hit_ability, spawn_character, Abilities, AttributeType, CharacterCategory, Group,
     },
@@ -13,9 +13,9 @@ use rand::seq::IteratorRandom;
 use std::{collections::VecDeque, mem};
 
 use super::{
-    battle_lifecycle::{handle_lifecycle_event, Alive, BattleLifecycleEvent},
+    battle_lifecycle::{handle_lifecycle_event, BattleLifecycleEvent, LifeState},
     battle_log::{cleanup_battle_log, setup_battle_log, update_battle_log, BattleLogEvent},
-    battle_resolution::setup_battle_resolution,
+    battle_resolution::{battle_resolution_button_interaction, setup_battle_resolution},
     battle_ui::{setup_battle_ui, update_top_text},
 };
 
@@ -49,17 +49,20 @@ impl Plugin for BattlePlugin {
                 )
                     .in_set(OnUpdate(AppState::Battle)),
             )
-            .add_system(setup_battle_resolution.in_schedule(OnEnter(BattleState::BattleEnd)));
+            .add_system(setup_battle_resolution.in_schedule(OnEnter(BattleState::BattleEnd)))
+            .add_system(
+                battle_resolution_button_interaction.in_set(OnUpdate(BattleState::BattleEnd)),
+            );
     }
 }
 
 #[derive(Resource)]
 pub struct BattleQueue {
-    queue: VecDeque<Entity>,
+    pub queue: VecDeque<Entity>,
 }
 
 impl BattleQueue {
-    fn get_current(&self) -> Entity {
+    pub fn get_current(&self) -> Entity {
         *self.queue.get(0).expect("Error: turn queue is empty!")
     }
 }
@@ -89,11 +92,10 @@ struct AbilityButton {
 }
 
 fn handle_enemy_turn(
-    mut res_queue: ResMut<BattleQueue>,
+    res_queue: ResMut<BattleQueue>,
     query_abilities: Query<&Abilities>,
     query_groups: Query<(Entity, &Group)>,
     mut ev_ability: EventWriter<AbilityCastEvent>,
-    mut next_state: ResMut<NextState<BattleState>>,
 ) {
     let mut rng = rand::thread_rng();
 
@@ -120,22 +122,18 @@ fn handle_enemy_turn(
             }
         }
     }
-
-    res_queue.queue.rotate_left(1);
-    next_state.set(BattleState::AbilityChoosingPlayer)
 }
 
 fn choose_target(
     mut commands: Commands,
-    mut res_queue: ResMut<BattleQueue>,
-    res_ability: Res<ChosenAbility>,
+    res_queue: ResMut<BattleQueue>,
+    res_ability: Option<Res<ChosenAbility>>,
     mut ev_ability: EventWriter<AbilityCastEvent>,
     mut interaction_query: Query<
         (Entity, &Interaction, &Group, &mut Sprite),
         (Changed<Interaction>, Without<Button>),
     >,
     mut ability_buttons_query: Query<&mut BackgroundColor, (With<AbilityButton>, With<Button>)>,
-    mut next_state: ResMut<NextState<BattleState>>,
 ) {
     for (entity, interaction, group, mut sprite) in interaction_query.iter_mut() {
         if *group == Group::Enemy {
@@ -144,21 +142,19 @@ fn choose_target(
                 Interaction::Clicked => {
                     sprite.color = Color::default();
 
-                    ev_ability.send(AbilityCastEvent {
-                        ability: res_ability.ability.clone(),
-                        by: res_queue.get_current(),
-                        on: vec![entity],
-                    });
+                    if let Some(ability) = res_ability.as_ref().map(|r| &r.ability) {
+                        ev_ability.send(AbilityCastEvent {
+                            ability: ability.clone(),
+                            by: res_queue.get_current(),
+                            on: vec![entity],
+                        });
 
-                    commands.remove_resource::<ChosenAbility>();
+                        commands.remove_resource::<ChosenAbility>();
 
-                    res_queue.queue.rotate_left(1);
-
-                    for mut color in &mut ability_buttons_query {
-                        *color = NORMAL_BUTTON.into();
+                        for mut color in &mut ability_buttons_query {
+                            *color = NORMAL_BUTTON.into();
+                        }
                     }
-
-                    next_state.set(BattleState::AbilityCastingEnemy);
 
                     break;
                 }
@@ -286,20 +282,20 @@ pub fn setup_battle(
         "player",
         CharacterCategory::Human,
         Group::Player,
-        get_hit_ability(5),
+        get_hit_ability(50),
     );
     commands.entity(player_character).insert((
         Battle,
         SpriteBundle {
             transform: Transform {
-                translation: Vec3::new(-20.0, 20.0, 0.0),
+                translation: Vec3::new(-300.0, 20.0, 0.0),
                 ..default()
             },
             texture: asset_server.load("images/human.png"),
             ..default()
         },
         Bar::new(AttributeType::HitPoints),
-        Alive,
+        LifeState::Alive,
     ));
 
     let enemy_character = spawn_character(
@@ -310,8 +306,40 @@ pub fn setup_battle(
         get_hit_ability(4),
     );
 
+    let enemy_character_2 = spawn_character(
+        &mut commands,
+        "fungus",
+        CharacterCategory::Fungi,
+        Group::Enemy,
+        get_hit_ability(6),
+    );
+
     let enemy_image = asset_server.load("images/fungus.png");
+
     commands.entity(enemy_character).insert((
+        Battle,
+        SpriteBundle {
+            transform: Transform {
+                translation: Vec3::new(120.0, 20.0, 0.0),
+                ..default()
+            },
+            texture: enemy_image.clone(),
+            ..default()
+        },
+        PickableBundle::default(),
+        Mesh2dHandle::from(
+            meshes.add(Mesh::from(shape::Quad::new(
+                images
+                    .get(&enemy_image)
+                    .map(|image| image.size())
+                    .unwrap_or(Vec2::ZERO),
+            ))),
+        ),
+        Bar::new(AttributeType::HitPoints),
+        LifeState::Alive,
+    ));
+
+    commands.entity(enemy_character_2).insert((
         Battle,
         SpriteBundle {
             transform: Transform {
@@ -331,11 +359,11 @@ pub fn setup_battle(
             ))),
         ),
         Bar::new(AttributeType::HitPoints),
-        Alive,
+        LifeState::Alive,
     ));
 
     commands.insert_resource(BattleQueue {
-        queue: [player_character, enemy_character].into(),
+        queue: [player_character, enemy_character, enemy_character_2].into(),
     });
 
     next_state.set(BattleState::AbilityChoosingPlayer);

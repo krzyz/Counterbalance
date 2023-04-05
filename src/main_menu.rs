@@ -7,10 +7,7 @@ impl Plugin for MainMenuPlugin {
     fn build(&self, app: &mut App) {
         app.add_system(setup_menu.in_schedule(OnEnter(AppState::MainMenu)))
             .add_system(cleanup_menu.in_schedule(OnExit(AppState::MainMenu)))
-            .add_systems(
-                (main_menu_button_looks, main_menu_button_clicks)
-                    .in_set(OnUpdate(AppState::MainMenu)),
-            );
+            .add_system(main_menu_button_interaction.in_set(OnUpdate(AppState::MainMenu)));
     }
 }
 
@@ -63,29 +60,14 @@ pub fn setup_menu(mut commands: Commands, asset_server: Res<AssetServer>) {
         });
 }
 
-pub fn main_menu_button_clicks(
+pub fn main_menu_button_interaction(
     mut interaction_query: Query<
-        (&Interaction, &MainMenuButton),
+        (&Interaction, &MainMenuButton, &mut BackgroundColor),
         (Changed<Interaction>, With<Button>),
     >,
     mut next_state: ResMut<NextState<AppState>>,
 ) {
-    for (interaction, button) in &mut interaction_query {
-        if let Interaction::Clicked = *interaction {
-            match *button {
-                MainMenuButton::StartGame => next_state.set(AppState::Battle),
-            }
-        }
-    }
-}
-
-pub fn main_menu_button_looks(
-    mut interaction_query: Query<
-        (&Interaction, &mut BackgroundColor),
-        (Changed<Interaction>, With<Button>),
-    >,
-) {
-    for (interaction, mut color) in &mut interaction_query {
+    for (interaction, button, mut color) in &mut interaction_query {
         match *interaction {
             Interaction::Hovered => {
                 *color = HOVERED_BUTTON.into();
@@ -93,7 +75,9 @@ pub fn main_menu_button_looks(
             Interaction::None => {
                 *color = NORMAL_BUTTON.into();
             }
-            _ => (),
+            Interaction::Clicked => match button {
+                MainMenuButton::StartGame => next_state.set(AppState::Battle),
+            },
         }
     }
 }

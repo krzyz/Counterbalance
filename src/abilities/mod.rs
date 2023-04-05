@@ -86,5 +86,6 @@ fn cast_ability(
                 }
             }
         }
+        ev_lifecycle.send(BattleLifecycleEvent::EndTurn)
     }
 }

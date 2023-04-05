@@ -4,13 +4,13 @@
 // Feel free to delete this line.
 #![allow(clippy::too_many_arguments, clippy::type_complexity)]
 
-mod ability;
+mod abilities;
 mod battle;
 mod character;
 mod main_menu;
 mod utils;
 
-use ability::AbilityPlugin;
+use abilities::AbilityPlugin;
 use battle::battle_plugin::BattlePlugin;
 use bevy::prelude::*;
 use bevy_mod_picking::PickingCameraBundle;

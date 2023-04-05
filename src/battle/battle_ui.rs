@@ -14,7 +14,7 @@ pub fn update_top_text(state: Res<State<BattleState>>, mut query: Query<&mut Tex
             BattleState::BattleInit => "",
             BattleState::BattleEnd => "",
             BattleState::AbilityChoosingPlayer => "Select an ability",
-            BattleState::AbilityTargeting => "Select a target",
+            BattleState::AbilityTargeting => "Select a target (Esc or RMB to cancel)",
             BattleState::AbilityCastingEnemy => "Enemy's turn",
             BattleState::AbilityResolution => "Resolving an ability",
         };

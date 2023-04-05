@@ -1,8 +1,8 @@
 use bevy::{prelude::*, utils::HashMap};
 
-use crate::ability::{Ability, AbilityType};
+use crate::abilities::{Ability, AbilityType};
 
-#[derive(Component, PartialEq, Eq)]
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Group {
     Player,
     Enemy,
@@ -50,7 +50,7 @@ pub fn get_hit_ability(potency: i32) -> Ability {
     Ability {
         name: "hit".to_string(),
         typ: AbilityType::ChangeAttribute(AttributeType::HitPoints),
-        potency: 5,
+        potency,
         side_effect: None,
     }
 }
