@@ -15,8 +15,7 @@ mod utils;
 use abilities::AbilityPlugin;
 use available_abilities::init_available_abilities;
 use battle::battle_plugin::BattlePlugin;
-use bevy::prelude::*;
-use bevy_mod_picking::PickingCameraBundle;
+use bevy::{core_pipeline::clear_color::ClearColorConfig, prelude::*};
 use bevy_prototype_lyon::prelude::*;
 use character::{
     Abilities, Attributes, Character, CharacterBundle, CharacterCategory, CharacterName, Group,
@@ -31,7 +30,18 @@ fn main() {
     App::new()
         .insert_resource(Msaa::Sample4)
         .init_resource::<GameState>()
-        .add_plugins(DefaultPlugins)
+        .add_plugins(DefaultPlugins.set(WindowPlugin {
+            primary_window: Some(Window {
+                title: "Counterbalance".into(),
+                resolution: (1280., 720.).into(),
+                // Tells wasm to resize the window according to the available canvas
+                fit_canvas_to_parent: true,
+                // Tells wasm not to override default event handling, like F5, Ctrl+R etc.
+                prevent_default_event_handling: false,
+                ..default()
+            }),
+            ..default()
+        }))
         .add_state::<AppState>()
         .add_state::<InitState>()
         .add_startup_systems((setup, init_available_abilities))
@@ -58,6 +68,9 @@ pub enum AppState {
     AbilityChoose,
 }
 
+#[derive(Component)]
+pub struct MainCamera;
+
 #[derive(Resource, Debug, Clone)]
 pub struct GameState {
     characters: Vec<Character>,
@@ -81,7 +94,13 @@ impl Default for GameState {
 }
 
 fn setup(mut commands: Commands) {
-    commands
-        .spawn(Camera2dBundle::default())
-        .insert(PickingCameraBundle::default());
+    commands.spawn((
+        Camera2dBundle {
+            camera_2d: Camera2d {
+                clear_color: ClearColorConfig::None,
+            },
+            ..default()
+        },
+        MainCamera,
+    ));
 }

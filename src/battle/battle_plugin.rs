@@ -4,7 +4,7 @@ use crate::{
     utils::bar::{Bar, BarPlugin},
     AppState, GameState, HOVERED_BUTTON, NORMAL_BUTTON,
 };
-use bevy::{prelude::*, sprite::Mesh2dHandle};
+use bevy::{prelude::*, render::view::RenderLayers, sprite::Mesh2dHandle};
 use bevy_mod_picking::{DefaultPickingPlugins, PickableBundle, PickableMesh};
 use rand::seq::IteratorRandom;
 
@@ -14,7 +14,7 @@ use super::{
     battle_lifecycle::{handle_lifecycle_event, BattleLifecycleEvent, LifeState},
     battle_log::{cleanup_battle_log, setup_battle_log, update_battle_log, BattleLogEvent},
     battle_resolution::{battle_resolution_button_interaction, setup_battle_resolution},
-    battle_ui::{setup_battle_ui, update_top_text},
+    battle_ui::{resize_battle_camera_viewport, setup_battle_ui, update_top_text},
     enemies::initialize_enemies,
 };
 
@@ -47,6 +47,7 @@ impl Plugin for BattlePlugin {
             .add_systems(
                 (
                     resize_meshes_for_sprites,
+                    resize_battle_camera_viewport,
                     update_battle_log,
                     update_top_text,
                     handle_lifecycle_event,
@@ -297,6 +298,7 @@ pub fn setup_battle(
                     texture: texture.clone(),
                     ..default()
                 },
+                RenderLayers::layer(1),
                 Battle,
                 PickableBundle::default(),
                 Mesh2dHandle::from(

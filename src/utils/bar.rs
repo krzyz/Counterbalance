@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{prelude::*, render::view::RenderLayers};
 use bevy_prototype_lyon::prelude::*;
 
 use crate::character::{Attribute, AttributeType, Attributes};
@@ -49,7 +49,16 @@ fn get_inner_shape(bar: &Bar, attributes: &Attributes, border_size: f32) -> shap
 fn setup_bar(
     mut commands: Commands,
     images: Res<Assets<Image>>,
-    query: Query<(Entity, &Bar, &Attributes, &Handle<Image>), Added<Bar>>,
+    query: Query<
+        (
+            Entity,
+            &Bar,
+            &Attributes,
+            &Handle<Image>,
+            Option<&RenderLayers>,
+        ),
+        Added<Bar>,
+    >,
 ) {
     const BORDER_SIZE: f32 = 2.0;
 
@@ -58,40 +67,48 @@ fn setup_bar(
         ..default()
     };
 
-    for (entity, bar, attributes, image_handle) in query.iter() {
+    for (entity, bar, attributes, image_handle, render_layers) in query.iter() {
         commands.entity(entity).with_children(|parent| {
             let (visibility, transform) = images
                 .get(image_handle)
                 .map(|image| (Visibility::default(), position_above_image(image)))
                 .unwrap_or_else(|| (Visibility::Hidden, Transform::default()));
 
-            parent
-                .spawn((
+            let mut bar_entity = parent.spawn((
+                ShapeBundle {
+                    path: GeometryBuilder::build_as(&shape),
+                    transform,
+                    visibility,
+                    ..default()
+                },
+                Fill::color(Color::WHITE),
+                Stroke::new(Color::BLACK, 2.0),
+            ));
+
+            bar_entity.with_children(|parent| {
+                let inner_shape = get_inner_shape(bar, attributes, BORDER_SIZE);
+
+                let mut bar_inside = parent.spawn((
                     ShapeBundle {
-                        path: GeometryBuilder::build_as(&shape),
-                        transform,
-                        visibility,
+                        path: GeometryBuilder::build_as(&inner_shape),
+                        transform: Transform::from_xyz(
+                            -0.5 * (shape.extents.x - BORDER_SIZE),
+                            -0.5 * (shape.extents.y - BORDER_SIZE),
+                            1.0,
+                        ),
                         ..default()
                     },
-                    Fill::color(Color::WHITE),
-                    Stroke::new(Color::BLACK, 2.0),
-                ))
-                .with_children(|parent| {
-                    let inner_shape = get_inner_shape(bar, attributes, BORDER_SIZE);
+                    Fill::color(Color::GREEN),
+                ));
 
-                    parent.spawn((
-                        ShapeBundle {
-                            path: GeometryBuilder::build_as(&inner_shape),
-                            transform: Transform::from_xyz(
-                                -0.5 * (shape.extents.x - BORDER_SIZE),
-                                -0.5 * (shape.extents.y - BORDER_SIZE),
-                                1.0,
-                            ),
-                            ..default()
-                        },
-                        Fill::color(Color::GREEN),
-                    ));
-                });
+                if let Some(layers) = render_layers {
+                    bar_inside.insert(layers.clone());
+                }
+            });
+
+            if let Some(layers) = render_layers {
+                bar_entity.insert(layers.clone());
+            }
         });
     }
 }
