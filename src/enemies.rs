@@ -14,7 +14,7 @@ pub enum EnemyTier {
     //Boss1,
 }
 
-#[derive(Resource)]
+#[derive(Resource, Debug)]
 pub struct AvailableEnemies(pub HashMap<EnemyTier, Vec<Character>>);
 
 pub fn get_abilities(
@@ -54,30 +54,30 @@ pub fn init_available_enemies(
 
     enemies.insert(
         EnemyTier::Normal1,
-        vec![Character::new(
-            CharacterBundle::new(
-                "fungus",
-                Fungus,
-                get_abilities(&["hit"], &abs).as_ref(),
-                &[(HitPoints, 50), (Attack, 5), (Defense, 5)],
-                Group::Enemy,
+        [
+            Character::new(
+                CharacterBundle::new(
+                    "fungus",
+                    Fungus,
+                    get_abilities(&["hit"], &abs).as_ref(),
+                    &[(HitPoints, 50), (Attack, 5), (Defense, 5)],
+                    Group::Enemy,
+                ),
+                "images/fungus.png",
             ),
-            "images/fungus.png",
-        )],
-    );
-
-    enemies.insert(
-        EnemyTier::Normal1,
-        vec![Character::new(
-            CharacterBundle::new(
-                "angry fungus",
-                Fungus,
-                get_abilities(&["slam"], &abs).as_ref(),
-                &[(HitPoints, 50), (Attack, 7), (Defense, 3)],
-                Group::Enemy,
+            Character::new(
+                CharacterBundle::new(
+                    "angry fungus",
+                    Fungus,
+                    get_abilities(&["slam"], &abs).as_ref(),
+                    &[(HitPoints, 50), (Attack, 7), (Defense, 3)],
+                    Group::Enemy,
+                ),
+                "images/fungus.png",
             ),
-            "images/fungus.png",
-        )],
+        ]
+        .into_iter()
+        .collect(),
     );
 
     commands.insert_resource(AvailableEnemies(enemies));

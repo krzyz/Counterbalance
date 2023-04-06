@@ -22,13 +22,13 @@ pub fn init_available_abilities(
         Ability {
             name: "hit".to_string(),
             typ: AbilityType::ChangeAttribute(AttributeType::HitPoints),
-            potency: 5,
+            potency: 15,
             side_effect: None,
         },
         Ability {
             name: "slam".to_string(),
             typ: AbilityType::ChangeAttribute(AttributeType::HitPoints),
-            potency: 10,
+            potency: 30,
             side_effect: None,
         },
         Ability {

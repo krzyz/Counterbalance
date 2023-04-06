@@ -58,7 +58,7 @@ pub enum AppState {
     AbilityChoose,
 }
 
-#[derive(Resource)]
+#[derive(Resource, Debug, Clone)]
 pub struct GameState {
     characters: Vec<Character>,
 }

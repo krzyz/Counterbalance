@@ -349,8 +349,16 @@ fn resize_meshes_for_sprites(
     }
 }
 
-pub fn cleanup_battle(mut commands: Commands, query: Query<Entity, With<Battle>>) {
+pub fn cleanup_battle(
+    mut commands: Commands,
+    mut game_state: ResMut<GameState>,
+    query: Query<Entity, With<Battle>>,
+) {
     for entity in query.iter() {
         commands.entity(entity).despawn_recursive();
     }
+
+    game_state
+        .characters
+        .retain(|char| char.bundle.group == Group::Player);
 }

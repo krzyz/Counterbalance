@@ -9,6 +9,8 @@ use crate::{
 pub fn initialize_enemies(enemies: Res<AvailableEnemies>, mut game_state: ResMut<GameState>) {
     let mut rng = rand::thread_rng();
 
+    info!("available enemies: {enemies:#?}");
+
     for enemy in enemies
         .0
         .get(&EnemyTier::Normal1)
@@ -19,4 +21,6 @@ pub fn initialize_enemies(enemies: Res<AvailableEnemies>, mut game_state: ResMut
     {
         game_state.characters.push(enemy.clone());
     }
+
+    info!("game state: {game_state:#?}");
 }
