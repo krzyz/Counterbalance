@@ -10,6 +10,7 @@ bevycheck = "0.5.2"
 bevy_mod_picking = "0.12"
 rand = "0.8.5"
 bevy_prototype_lyon = "0.8.0"
+enumset = "1.0.12"
 
 # Enable a small amount of optimization in debug mode
 [profile.dev]

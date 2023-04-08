@@ -14,7 +14,7 @@ mod utils;
 
 use abilities::AbilityPlugin;
 use available_abilities::init_available_abilities;
-use battle::battle_plugin::BattlePlugin;
+use battle::BattlePlugin;
 use bevy::{core_pipeline::clear_color::ClearColorConfig, prelude::*};
 use bevy_prototype_lyon::prelude::*;
 use character::{
@@ -26,6 +26,9 @@ use main_menu::MainMenuPlugin;
 pub const NORMAL_BUTTON: Color = Color::rgb(0.15, 0.15, 0.15);
 pub const HOVERED_BUTTON: Color = Color::rgb(0.25, 0.25, 0.25);
 
+pub const WINDOW_WIDTH: f32 = 1280.0;
+pub const WINDOW_HEIGHT: f32 = 720.0;
+
 fn main() {
     App::new()
         .insert_resource(Msaa::Sample4)
@@ -33,7 +36,7 @@ fn main() {
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 title: "Counterbalance".into(),
-                resolution: (1280., 720.).into(),
+                resolution: (WINDOW_WIDTH, WINDOW_HEIGHT).into(),
                 // Tells wasm to resize the window according to the available canvas
                 fit_canvas_to_parent: true,
                 // Tells wasm not to override default event handling, like F5, Ctrl+R etc.
@@ -97,7 +100,7 @@ fn setup(mut commands: Commands) {
     commands.spawn((
         Camera2dBundle {
             camera_2d: Camera2d {
-                clear_color: ClearColorConfig::None,
+                clear_color: ClearColorConfig::Custom(Color::BLACK),
             },
             ..default()
         },

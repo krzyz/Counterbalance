@@ -3,9 +3,9 @@ use bevy::prelude::*;
 use crate::character::{CharacterName, Group};
 
 use super::{
-    battle_log::BattleLogEvent,
-    battle_plugin::{BattleQueue, BattleState},
-    battle_resolution::BattleResolution,
+    log::BattleLogEvent,
+    resolution::BattleResolution,
+    {BattleQueue, BattleState},
 };
 
 pub enum BattleLifecycleEvent {

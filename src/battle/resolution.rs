@@ -2,7 +2,7 @@ use bevy::prelude::*;
 
 use crate::{character::Group, AppState, HOVERED_BUTTON, NORMAL_BUTTON};
 
-use super::battle_plugin::Battle;
+use super::Battle;
 
 #[derive(Resource)]
 pub struct BattleResolution {

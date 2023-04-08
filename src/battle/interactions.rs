@@ -1,75 +1,19 @@
 use crate::{
     abilities::{Ability, AbilityCastEvent},
-    character::{Abilities, AttributeType, Group},
-    utils::bar::{Bar, BarPlugin},
-    AppState, GameState, HOVERED_BUTTON, NORMAL_BUTTON,
+    character::{Abilities, Group},
+    GameState, HOVERED_BUTTON, NORMAL_BUTTON,
 };
-use bevy::{prelude::*, render::view::RenderLayers, sprite::Mesh2dHandle};
-use bevy_mod_picking::{DefaultPickingPlugins, PickableBundle, PickableMesh};
+use bevy::{prelude::*, sprite::Mesh2dHandle};
+use bevy_mod_picking::PickableMesh;
 use rand::seq::IteratorRandom;
 
-use std::{collections::VecDeque, mem};
+use std::mem;
 
-use super::{
-    battle_lifecycle::{handle_lifecycle_event, BattleLifecycleEvent, LifeState},
-    battle_log::{cleanup_battle_log, setup_battle_log, update_battle_log, BattleLogEvent},
-    battle_resolution::{battle_resolution_button_interaction, setup_battle_resolution},
-    battle_ui::{resize_battle_camera_viewport, setup_battle_ui, update_top_text},
-    enemies::initialize_enemies,
-};
+use super::{ui::Tile, Battle, BattleQueue, BattleState};
 
-pub struct BattlePlugin;
-
-impl Plugin for BattlePlugin {
-    fn build(&self, app: &mut App) {
-        app.add_state::<BattleState>()
-            .add_event::<BattleLogEvent>()
-            .add_event::<BattleLifecycleEvent>()
-            .add_plugins(DefaultPickingPlugins)
-            .add_plugin(BarPlugin)
-            .add_systems(
-                (
-                    setup_battle_log,
-                    setup_battle_ui,
-                    initialize_enemies,
-                    setup_battle,
-                )
-                    .chain()
-                    .in_schedule(OnEnter(AppState::Battle)),
-            )
-            .add_systems((cleanup_battle, cleanup_battle_log).in_schedule(OnExit(AppState::Battle)))
-            .add_system(choose_action.in_set(OnUpdate(BattleState::AbilityChoosingPlayer)))
-            .add_system(choose_target.in_set(OnUpdate(BattleState::AbilityTargeting)))
-            .add_system(
-                setup_available_actions.in_schedule(OnEnter(BattleState::AbilityChoosingPlayer)),
-            )
-            .add_system(handle_enemy_turn.in_schedule(OnEnter(BattleState::AbilityCastingEnemy)))
-            .add_systems(
-                (
-                    resize_meshes_for_sprites,
-                    resize_battle_camera_viewport,
-                    update_battle_log,
-                    update_top_text,
-                    handle_lifecycle_event,
-                )
-                    .in_set(OnUpdate(AppState::Battle)),
-            )
-            .add_system(setup_battle_resolution.in_schedule(OnEnter(BattleState::BattleEnd)))
-            .add_system(
-                battle_resolution_button_interaction.in_set(OnUpdate(BattleState::BattleEnd)),
-            );
-    }
-}
-
-#[derive(Resource, Default)]
-pub struct BattleQueue {
-    pub queue: VecDeque<Entity>,
-}
-
-impl BattleQueue {
-    pub fn get_current(&self) -> Entity {
-        *self.queue.get(0).expect("Error: turn queue is empty!")
-    }
+#[derive(Component)]
+pub struct AbilityButton {
+    ability_name: String,
 }
 
 #[derive(Resource)]
@@ -77,26 +21,7 @@ pub struct ChosenAbility {
     ability: Ability,
 }
 
-#[derive(States, PartialEq, Eq, Debug, Clone, Hash, Default)]
-pub enum BattleState {
-    #[default]
-    BattleInit,
-    BattleEnd,
-    AbilityChoosingPlayer,
-    AbilityTargeting,
-    AbilityCastingEnemy,
-    AbilityResolution,
-}
-
-#[derive(Component)]
-pub struct Battle;
-
-#[derive(Component)]
-struct AbilityButton {
-    ability_name: String,
-}
-
-fn handle_enemy_turn(
+pub fn handle_enemy_turn(
     res_queue: ResMut<BattleQueue>,
     query_abilities: Query<&Abilities>,
     query_groups: Query<(Entity, &Group)>,
@@ -129,7 +54,25 @@ fn handle_enemy_turn(
     }
 }
 
-fn choose_target(
+pub fn highlight_tile(
+    mut materials: ResMut<Assets<ColorMaterial>>,
+    mut interaction_query: Query<
+        (&Interaction, &mut Handle<ColorMaterial>),
+        (Changed<Interaction>, With<Tile>),
+    >,
+) {
+    for (interaction, mut material) in interaction_query.iter_mut() {
+        match *interaction {
+            Interaction::Hovered => {
+                *material = materials.add(ColorMaterial::from(Color::LIME_GREEN))
+            }
+            Interaction::None => *material = materials.add(ColorMaterial::from(Color::GRAY)),
+            _ => (),
+        }
+    }
+}
+
+pub fn choose_target(
     mut commands: Commands,
     res_queue: ResMut<BattleQueue>,
     res_ability: Option<Res<ChosenAbility>>,
@@ -171,7 +114,7 @@ fn choose_target(
     }
 }
 
-fn choose_action(
+pub fn choose_action(
     mut commands: Commands,
     res_queue: Res<BattleQueue>,
     mut interaction_query: Query<
@@ -215,7 +158,7 @@ fn choose_action(
 #[derive(Component)]
 pub struct AvailableActionsNode;
 
-fn setup_available_actions(
+pub fn setup_available_actions(
     mut commands: Commands,
     res_queue: Res<BattleQueue>,
     asset_server: Res<AssetServer>,
@@ -275,54 +218,7 @@ fn setup_available_actions(
     }
 }
 
-pub fn setup_battle(
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-    images: Res<Assets<Image>>,
-    game_state: Res<GameState>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut next_state: ResMut<NextState<BattleState>>,
-) {
-    let mut queue = BattleQueue::default();
-
-    for (i, character) in game_state.characters.iter().enumerate() {
-        let texture = asset_server.load(character.image_path.clone());
-        let id = commands
-            .spawn((
-                character.bundle.clone(),
-                SpriteBundle {
-                    transform: Transform {
-                        translation: Vec3::new(-300.0 + (200 * i) as f32, 20.0, 0.0),
-                        ..default()
-                    },
-                    texture: texture.clone(),
-                    ..default()
-                },
-                RenderLayers::layer(1),
-                Battle,
-                PickableBundle::default(),
-                Mesh2dHandle::from(
-                    meshes.add(Mesh::from(shape::Quad::new(
-                        images
-                            .get(&texture)
-                            .map(|image| image.size())
-                            .unwrap_or(Vec2::ZERO),
-                    ))),
-                ),
-                Bar::new(AttributeType::HitPoints),
-                LifeState::Alive,
-            ))
-            .id();
-
-        queue.queue.push_back(id);
-    }
-
-    commands.insert_resource(queue);
-
-    next_state.set(BattleState::AbilityChoosingPlayer);
-}
-
-fn resize_meshes_for_sprites(
+pub fn resize_meshes_for_sprites(
     images: Res<Assets<Image>>,
     mut ev_image_asset: EventReader<AssetEvent<Image>>,
     mut meshes: ResMut<Assets<Mesh>>,

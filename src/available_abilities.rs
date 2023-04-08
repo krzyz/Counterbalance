@@ -1,5 +1,5 @@
 use crate::{
-    abilities::{Ability, AbilityType},
+    abilities::{Ability, AbilityTargetType, AbilityType},
     character::AttributeType,
     InitState,
 };
@@ -20,27 +20,30 @@ pub fn init_available_abilities(
 ) {
     let abilities = vec![
         Ability {
+            name: "move".to_string(),
+            typ: AbilityType::Movement,
+            target: AbilityTargetType::Empty.into(),
+            range: 5,
+            side_effect: None,
+        },
+        Ability {
             name: "hit".to_string(),
-            typ: AbilityType::ChangeAttribute(AttributeType::HitPoints),
-            potency: 15,
+            typ: AbilityType::ChangeAttribute {
+                typ: AttributeType::HitPoints,
+                potency: 15,
+            },
+            target: AbilityTargetType::Enemy.into(),
+            range: 2,
             side_effect: None,
         },
         Ability {
             name: "slam".to_string(),
-            typ: AbilityType::ChangeAttribute(AttributeType::HitPoints),
-            potency: 30,
-            side_effect: None,
-        },
-        Ability {
-            name: "weaken defense".to_string(),
-            typ: AbilityType::ChangeAttribute(AttributeType::Defense),
-            potency: -1,
-            side_effect: None,
-        },
-        Ability {
-            name: "weaken attack".to_string(),
-            typ: AbilityType::ChangeAttribute(AttributeType::Attack),
-            potency: -1,
+            typ: AbilityType::ChangeAttribute {
+                typ: AttributeType::HitPoints,
+                potency: 15,
+            },
+            target: AbilityTargetType::Enemy.into(),
+            range: 1,
             side_effect: None,
         },
     ]

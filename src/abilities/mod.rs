@@ -1,9 +1,10 @@
 pub mod choose_ability_screen;
 
 use bevy::prelude::*;
+use enumset::{EnumSet, EnumSetType};
 
-use crate::battle::battle_lifecycle::BattleLifecycleEvent;
-use crate::battle::battle_log::BattleLogEvent;
+use crate::battle::lifecycle::BattleLifecycleEvent;
+use crate::battle::log::BattleLogEvent;
 use crate::character::{Attribute, AttributeType, Attributes, CharacterCategory, CharacterName};
 use crate::AppState;
 
@@ -27,13 +28,22 @@ pub struct AbilityCastEvent {
 pub struct Ability {
     pub name: String,
     pub typ: AbilityType,
-    pub potency: i32,
+    pub target: EnumSet<AbilityTargetType>,
+    pub range: i32,
     pub side_effect: Option<Box<Ability>>,
+}
+
+#[derive(EnumSetType, Debug)]
+pub enum AbilityTargetType {
+    Empty,
+    Ally,
+    Enemy,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AbilityType {
-    ChangeAttribute(AttributeType),
+    ChangeAttribute { typ: AttributeType, potency: i32 },
+    Movement,
 }
 
 fn resolve_ability(
@@ -60,15 +70,14 @@ fn resolve_ability(
         for (entity, name, _category, mut attributes) in set.p1().iter_mut() {
             if ability_cast.on.contains(&entity) {
                 match ability_cast.ability.typ {
-                    AbilityType::ChangeAttribute(attribute_type) => {
-                        if let Some(attribute) = attributes.0.get_mut(&attribute_type) {
+                    AbilityType::ChangeAttribute { typ, potency } => {
+                        if let Some(attribute) = attributes.0.get_mut(&typ) {
                             match attribute {
                                 Attribute::Value(v) => {
-                                    *v -= ability_cast.ability.potency;
+                                    *v -= potency;
                                 }
                                 Attribute::Gauge { value, min, max } => {
-                                    *value =
-                                        (*value - ability_cast.ability.potency).clamp(*min, *max);
+                                    *value = (*value - potency).clamp(*min, *max);
 
                                     ev_battle_log.send(BattleLogEvent {
                                         message: format!(
@@ -77,7 +86,7 @@ fn resolve_ability(
                                         ),
                                     });
 
-                                    if attribute_type == AttributeType::HitPoints && *value <= 0 {
+                                    if typ == AttributeType::HitPoints && *value <= 0 {
                                         ev_lifecycle
                                             .send(BattleLifecycleEvent::CharacterDied(entity))
                                     }
@@ -85,6 +94,7 @@ fn resolve_ability(
                             }
                         }
                     }
+                    AbilityType::Movement => unimplemented!(),
                 }
             }
         }
