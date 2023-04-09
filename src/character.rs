@@ -31,12 +31,7 @@ impl CharacterBundle {
         Self {
             name: CharacterName(name.to_string()),
             category,
-            abilities: Abilities(
-                abilities
-                    .into_iter()
-                    .map(|ability| (ability.name.clone(), ability.clone()))
-                    .collect(),
-            ),
+            abilities: Abilities::from_arr(abilities),
             attributes: Attributes(
                 attributes
                     .into_iter()
@@ -85,6 +80,17 @@ pub enum CharacterCategory {
 
 #[derive(Component, Debug, Clone, Default)]
 pub struct Abilities(pub HashMap<String, Ability>);
+
+impl Abilities {
+    pub fn from_arr(abilities: &[Ability]) -> Self {
+        Self(
+            abilities
+                .into_iter()
+                .map(|ability| (ability.name.clone(), ability.clone()))
+                .collect(),
+        )
+    }
+}
 
 #[derive(Component, Debug, Clone)]
 pub struct Attributes(pub HashMap<AttributeType, Attribute>);

@@ -3,7 +3,7 @@ use bevy::{prelude::*, utils::HashMap};
 use crate::{
     abilities::Ability,
     available_abilities::AvailableAbilities,
-    character::{AttributeType, Character, CharacterBundle, CharacterCategory, Group},
+    character::{Abilities, AttributeType, Character, CharacterBundle, CharacterCategory, Group},
     GameState,
 };
 
@@ -41,10 +41,7 @@ pub fn init_available_enemies(
 ) {
     let player = game_state.characters.get_mut(0).unwrap();
 
-    player.bundle.abilities.0.insert(
-        "hit".to_string(),
-        get_abilities(&["hit"], &abs).get(0).unwrap().clone(),
-    );
+    player.bundle.abilities = Abilities::from_arr(get_abilities(&["move", "hit"], &abs).as_ref());
 
     info!("Starting enemies init");
     use AttributeType::*;

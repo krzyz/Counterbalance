@@ -1,7 +1,10 @@
 use bevy::{prelude::*, render::view::RenderLayers};
 use bevy_prototype_lyon::prelude::*;
 
-use crate::character::{Attribute, AttributeType, Attributes};
+use crate::{
+    battle::{battle_field::BattleField, init::get_scaling},
+    character::{Attribute, AttributeType, Attributes},
+};
 
 pub struct BarPlugin;
 
@@ -113,11 +116,16 @@ fn setup_bar(
     }
 }
 
+fn invert_scale(scale: &Vec3) -> Vec3 {
+    Vec3::new(1.0 / scale.x, 1.0 / scale.y, 1.0 / scale.z)
+}
+
 fn correct_bar_position(
     images: Res<Assets<Image>>,
+    battle_field: Option<Res<BattleField>>,
     mut ev_image_asset: EventReader<AssetEvent<Image>>,
     entity_query: Query<(&Handle<Image>, &Children), With<Bar>>,
-    mut transform_query: Query<(&mut Transform, &mut Visibility)>,
+    mut transform_query: Query<(&mut Transform, &mut Visibility), Without<Bar>>,
 ) {
     for ev in ev_image_asset.iter() {
         match ev {
@@ -134,6 +142,13 @@ fn correct_bar_position(
                     *transform = position_above_image(
                         images.get(handle).expect("Wrong image asset created event"),
                     );
+
+                    if let Some(battle_field) = battle_field.as_ref() {
+                        *transform = transform.with_scale(invert_scale(&get_scaling(
+                            images.get(handle),
+                            battle_field.tile_size(),
+                        )));
+                    }
                     *visibility = Visibility::default();
                 }
             }

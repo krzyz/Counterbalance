@@ -11,9 +11,9 @@ use crate::{
 
 use super::{battle_field::BattleField, lifecycle::LifeState, Battle, BattleQueue, BattleState};
 
-fn get_scaling(image: Option<&Image>, tile_size: f32) -> Vec3 {
+pub fn get_scaling(image: Option<&Image>, tile_size: f32) -> Vec3 {
     image
-        .map(|image| Vec3::splat(tile_size / image.size().distance(Vec2::ZERO)))
+        .map(|image| Vec3::splat(2.0 * tile_size / image.size().distance(Vec2::ZERO)))
         .unwrap_or(Vec3::ONE)
 }
 

@@ -94,12 +94,12 @@ impl Default for GameState {
                 image_path: "images/human.png".to_string(),
             }],
             battle_field_layout: BattleFieldLayout {
-                size: (18, 9).into(),
-                player_start: [(0, 4), (0, 0), (0, 8)]
+                size: (12, 7).into(),
+                player_start: [(0, 3), (0, 0), (0, 6)]
                     .into_iter()
                     .map(|p| p.into())
                     .collect(),
-                enemy_start: [(16, 3), (16, 5), (17, 4), (17, 2), (17, 6)]
+                enemy_start: [(10, 2), (10, 4), (11, 3), (11, 1), (11, 5)]
                     .into_iter()
                     .map(|p| p.into())
                     .collect(),
