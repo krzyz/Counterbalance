@@ -40,7 +40,7 @@ pub fn init_available_abilities(
             name: "slam".to_string(),
             typ: AbilityType::ChangeAttribute {
                 typ: AttributeType::HitPoints,
-                potency: 30,
+                potency: 20,
             },
             target: AbilityTargetType::Enemy.into(),
             range: 1,

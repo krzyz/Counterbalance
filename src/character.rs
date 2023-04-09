@@ -40,12 +40,8 @@ impl CharacterBundle {
                         (
                             typ,
                             match typ.get_corresponding_value_type() {
-                                AttributeValueType::Value => Attribute::Value(value),
-                                AttributeValueType::Gauge => Attribute::Gauge {
-                                    value,
-                                    min: 0,
-                                    max: value,
-                                },
+                                AttributeValueType::Value => Attribute::value(value),
+                                AttributeValueType::Gauge => Attribute::gauge(value),
                             },
                         )
                     })
@@ -99,16 +95,9 @@ impl Default for Attributes {
     fn default() -> Self {
         Attributes(
             [
-                (
-                    AttributeType::HitPoints,
-                    Attribute::Gauge {
-                        value: 50,
-                        min: 0,
-                        max: 50,
-                    },
-                ),
-                (AttributeType::Attack, Attribute::Value(10)),
-                (AttributeType::Defense, Attribute::Value(10)),
+                (AttributeType::HitPoints, Attribute::gauge(150)),
+                (AttributeType::Attack, Attribute::value(10)),
+                (AttributeType::Defense, Attribute::value(10)),
             ]
             .into_iter()
             .collect(),
@@ -147,4 +136,18 @@ pub enum AttributeValueType {
 pub enum Attribute {
     Value(i32),
     Gauge { value: i32, min: i32, max: i32 },
+}
+
+impl Attribute {
+    pub fn value(value: i32) -> Self {
+        Self::Value(value)
+    }
+
+    pub fn gauge(max: i32) -> Self {
+        Self::Gauge {
+            value: max,
+            min: 0,
+            max,
+        }
+    }
 }

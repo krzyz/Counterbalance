@@ -54,23 +54,43 @@ pub fn init_available_enemies(
         [
             Character::new(
                 CharacterBundle::new(
-                    "fungus",
+                    "mushroom",
                     Fungus,
                     get_abilities(&["hit"], &abs).as_ref(),
                     &[(HitPoints, 50), (Attack, 5), (Defense, 5)],
                     Group::Enemy,
                 ),
-                "images/fungus.png",
+                "images/fungus1.png",
             ),
             Character::new(
                 CharacterBundle::new(
-                    "angry fungus",
+                    "wideshroom",
                     Fungus,
                     get_abilities(&["slam"], &abs).as_ref(),
                     &[(HitPoints, 50), (Attack, 7), (Defense, 3)],
                     Group::Enemy,
                 ),
-                "images/fungus.png",
+                "images/fungus2.png",
+            ),
+            Character::new(
+                CharacterBundle::new(
+                    "purpleshroom",
+                    Fungus,
+                    get_abilities(&["hit"], &abs).as_ref(),
+                    &[(HitPoints, 50), (Attack, 7), (Defense, 3)],
+                    Group::Enemy,
+                ),
+                "images/fungus3.png",
+            ),
+            Character::new(
+                CharacterBundle::new(
+                    "manyshroom",
+                    Fungus,
+                    get_abilities(&["hit"], &abs).as_ref(),
+                    &[(HitPoints, 50), (Attack, 7), (Defense, 3)],
+                    Group::Enemy,
+                ),
+                "images/fungus4.png",
             ),
         ]
         .into_iter()

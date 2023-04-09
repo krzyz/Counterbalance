@@ -14,7 +14,7 @@ pub fn initialize_enemies(enemies: Res<AvailableEnemies>, mut game_state: ResMut
         .get(&EnemyTier::Normal1)
         .expect("Missing normal enemies!")
         .into_iter()
-        .choose_multiple(&mut rng, 1)
+        .choose_multiple(&mut rng, 4)
         .into_iter()
     {
         game_state.characters.push(enemy.clone());

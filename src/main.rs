@@ -94,7 +94,7 @@ impl Default for GameState {
                     attributes: Attributes::default(),
                     group: Group::Player,
                 },
-                image_path: "images/human.png".to_string(),
+                image_path: "images/kitty.png".to_string(),
             }],
             battle_field_layout: BattleFieldLayout {
                 size: (12, 7).into(),
