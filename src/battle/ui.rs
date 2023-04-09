@@ -1,5 +1,3 @@
-use std::f32::consts::PI;
-
 use bevy::{
     core_pipeline::clear_color::ClearColorConfig,
     prelude::*,
@@ -7,11 +5,9 @@ use bevy::{
         camera::{ScalingMode, Viewport},
         view::RenderLayers,
     },
-    sprite::{MaterialMesh2dBundle, Mesh2dHandle},
-    utils::HashMap,
     window::WindowResized,
 };
-use bevy_mod_picking::{PickableBundle, PickingCameraBundle};
+use bevy_mod_picking::PickingCameraBundle;
 
 use crate::{WINDOW_HEIGHT, WINDOW_WIDTH};
 
@@ -28,38 +24,6 @@ pub struct TopText;
 
 #[derive(Component)]
 pub struct BattleCamera;
-
-#[derive(Component)]
-pub struct Tile;
-
-#[derive(Resource)]
-pub struct BattleField {
-    tiles: HashMap<IVec2, Entity>,
-    rev_map: HashMap<Entity, IVec2>,
-    size: IVec2,
-}
-
-impl BattleField {
-    pub fn new(tiles: HashMap<IVec2, Entity>) -> Self {
-        let rev_map = tiles.iter().map(|(pos, entity)| (*entity, *pos)).collect();
-        let size = (
-            tiles.iter().map(|(p, _)| p.x).max().unwrap_or(0),
-            tiles.iter().map(|(p, _)| p.y).max().unwrap_or(0),
-        )
-            .into();
-        BattleField {
-            tiles,
-            rev_map,
-            size,
-        }
-    }
-    pub fn tile(&self, pos: &IVec2) -> Option<Entity> {
-        self.tiles.get(&pos).copied()
-    }
-    pub fn pos(&self, entity: Entity) -> Option<IVec2> {
-        self.rev_map.get(&entity).copied()
-    }
-}
 
 pub fn update_top_text(state: Res<State<BattleState>>, mut query: Query<&mut Text, With<TopText>>) {
     if state.is_changed() {
@@ -169,12 +133,8 @@ pub fn setup_battle_ui(
     mut commands: Commands,
     windows: Query<&Window>,
     asset_server: Res<AssetServer>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
     let window = windows.single();
-
-    let min_world_size = Vec2::new(WINDOW_WIDTH, WINDOW_HEIGHT);
 
     commands.spawn((
         Camera2dBundle {
@@ -189,8 +149,8 @@ pub fn setup_battle_ui(
             },
             projection: OrthographicProjection {
                 scaling_mode: ScalingMode::AutoMin {
-                    min_width: min_world_size.x,
-                    min_height: min_world_size.y,
+                    min_width: WINDOW_WIDTH,
+                    min_height: WINDOW_HEIGHT,
                 },
                 ..default()
             },
@@ -254,70 +214,6 @@ pub fn setup_battle_ui(
                 });
             build_right_pane(parent, &asset_server);
         });
-
-    setup_battle_field(&mut commands, &mut meshes, &mut materials, min_world_size);
-}
-
-pub fn setup_battle_field(
-    commands: &mut Commands,
-    meshes: &mut ResMut<Assets<Mesh>>,
-    materials: &mut ResMut<Assets<ColorMaterial>>,
-    min_world_size: Vec2,
-) {
-    let size = IVec2::new(18, 8);
-
-    let bottom_left_corner = Vec2::ZERO - 0.5 * min_world_size;
-    info!("world size: {min_world_size:?}");
-
-    let tile_size = (min_world_size.x / (size.x as f32 * 1.5 + 0.5))
-        .min(min_world_size.y / (3.0f32.sqrt() * (size.y as f32 + 0.5)));
-
-    info!("tile size: {tile_size:?}");
-    let hor_spacing = 1.5 * tile_size;
-    let ver_spacing = 3.0f32.sqrt() * tile_size;
-    let corner_pos = bottom_left_corner
-        + 0.5 * Vec2::new(2.0 * tile_size, ver_spacing)
-        + 0.5
-            * Vec2::new(
-                min_world_size.x - tile_size * (1.5 * size.x as f32 + 0.5),
-                min_world_size.y - tile_size * 3.0f32.sqrt() * (size.y as f32 + 0.5),
-            );
-
-    let mut tiles = HashMap::new();
-    let tile_mesh: Mesh2dHandle = meshes
-        .add(Mesh::from(shape::RegularPolygon::new(tile_size - 1.0, 6)))
-        .into();
-    let tile_material = materials.add(ColorMaterial::from(Color::GRAY));
-
-    for x in 0..size.x {
-        for y in 0..size.y {
-            let transform = Transform::from_xyz(
-                corner_pos.x + x as f32 * hor_spacing,
-                corner_pos.y + (y as f32 + 0.5 * (x % 2) as f32) * ver_spacing,
-                0.0,
-            )
-            .with_rotation(Quat::from_rotation_z(0.5 * PI));
-
-            let id = commands
-                .spawn((
-                    Tile,
-                    MaterialMesh2dBundle {
-                        mesh: tile_mesh.clone(),
-                        transform,
-                        material: tile_material.clone(),
-                        ..default()
-                    },
-                    Battle,
-                    RenderLayers::layer(1),
-                    PickableBundle::default(),
-                ))
-                .id();
-
-            tiles.insert((x, y).into(), id);
-        }
-    }
-
-    commands.insert_resource(BattleField::new(tiles));
 }
 
 pub fn resize_battle_camera_viewport(

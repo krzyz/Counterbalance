@@ -14,7 +14,7 @@ mod utils;
 
 use abilities::AbilityPlugin;
 use available_abilities::init_available_abilities;
-use battle::BattlePlugin;
+use battle::{battle_field::BattleFieldLayout, BattlePlugin};
 use bevy::{core_pipeline::clear_color::ClearColorConfig, prelude::*};
 use bevy_prototype_lyon::prelude::*;
 use character::{
@@ -77,6 +77,7 @@ pub struct MainCamera;
 #[derive(Resource, Debug, Clone)]
 pub struct GameState {
     characters: Vec<Character>,
+    battle_field_layout: BattleFieldLayout,
 }
 
 impl Default for GameState {
@@ -92,6 +93,17 @@ impl Default for GameState {
                 },
                 image_path: "images/human.png".to_string(),
             }],
+            battle_field_layout: BattleFieldLayout {
+                size: (18, 9).into(),
+                player_start: [(0, 4), (0, 0), (0, 8)]
+                    .into_iter()
+                    .map(|p| p.into())
+                    .collect(),
+                enemy_start: [(16, 3), (16, 5), (17, 4), (17, 2), (17, 6)]
+                    .into_iter()
+                    .map(|p| p.into())
+                    .collect(),
+            },
         }
     }
 }

@@ -3,13 +3,10 @@ use crate::{
     character::{Abilities, Group},
     GameState, HOVERED_BUTTON, NORMAL_BUTTON,
 };
-use bevy::{prelude::*, sprite::Mesh2dHandle};
-use bevy_mod_picking::PickableMesh;
+use bevy::prelude::*;
 use rand::seq::IteratorRandom;
 
-use std::mem;
-
-use super::{ui::Tile, Battle, BattleQueue, BattleState};
+use super::{battle_field::Tile, Battle, BattleQueue, BattleState};
 
 #[derive(Component)]
 pub struct AbilityButton {
@@ -215,35 +212,6 @@ pub fn setup_available_actions(
             .collect::<Vec<_>>();
 
         commands.entity(entity).push_children(children.as_ref());
-    }
-}
-
-pub fn resize_meshes_for_sprites(
-    images: Res<Assets<Image>>,
-    mut ev_image_asset: EventReader<AssetEvent<Image>>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut query: Query<(&Handle<Image>, &mut Mesh2dHandle), With<PickableMesh>>,
-) {
-    for ev in ev_image_asset.iter() {
-        match ev {
-            AssetEvent::Created { handle } => {
-                for mut mesh in query
-                    .iter_mut()
-                    .filter_map(|(q_handle, mesh)| (q_handle == handle).then_some(mesh))
-                {
-                    let size = images
-                        .get(&handle)
-                        .expect("Should have gotten new image, asset event lied")
-                        .size();
-
-                    let new_mesh = meshes.add(Mesh::from(shape::Quad::new(size)));
-                    let old_mesh = mem::replace(&mut mesh.0, new_mesh);
-
-                    meshes.remove(old_mesh);
-                }
-            }
-            _ => (),
-        }
     }
 }
 

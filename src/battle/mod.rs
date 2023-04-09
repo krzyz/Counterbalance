@@ -1,3 +1,4 @@
+pub mod battle_field;
 pub mod enemies;
 pub mod init;
 pub mod interactions;
@@ -13,13 +14,17 @@ use bevy_mod_picking::DefaultPickingPlugins;
 
 use crate::{utils::bar::BarPlugin, AppState};
 
-use self::{enemies::*, init::*, interactions::*, lifecycle::*, log::*, resolution::*, ui::*};
+use self::{
+    battle_field::*, enemies::*, init::*, interactions::*, lifecycle::*, log::*, resolution::*,
+    ui::*,
+};
 
 pub struct BattlePlugin;
 
 impl Plugin for BattlePlugin {
     fn build(&self, app: &mut App) {
-        app.add_state::<BattleState>()
+        app.add_state::<BattleInitState>()
+            .add_state::<BattleState>()
             .add_event::<BattleLogEvent>()
             .add_event::<BattleLifecycleEvent>()
             .add_plugins(DefaultPickingPlugins)
@@ -29,11 +34,12 @@ impl Plugin for BattlePlugin {
                     setup_battle_log,
                     setup_battle_ui,
                     initialize_enemies,
-                    setup_battle,
+                    setup_battle_field,
                 )
                     .chain()
                     .in_schedule(OnEnter(AppState::Battle)),
             )
+            .add_system(setup_battle.in_schedule(OnEnter(BattleInitState::AfterBattleField)))
             .add_systems((cleanup_battle, cleanup_battle_log).in_schedule(OnExit(AppState::Battle)))
             .add_system(choose_action.in_set(OnUpdate(BattleState::AbilityChoosingPlayer)))
             .add_system(choose_target.in_set(OnUpdate(BattleState::AbilityTargeting)))
@@ -68,6 +74,13 @@ impl BattleQueue {
     pub fn get_current(&self) -> Entity {
         *self.queue.get(0).expect("Error: turn queue is empty!")
     }
+}
+
+#[derive(States, PartialEq, Eq, Debug, Clone, Hash, Default)]
+pub enum BattleInitState {
+    #[default]
+    BeforeBattleField,
+    AfterBattleField,
 }
 
 #[derive(States, PartialEq, Eq, Debug, Clone, Hash, Default)]

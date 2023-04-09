@@ -21,7 +21,7 @@ pub enum LifeState {
 
 pub fn handle_lifecycle_event(
     mut commands: Commands,
-    mut res_queue: ResMut<BattleQueue>,
+    mut res_queue: Option<ResMut<BattleQueue>>,
     mut ev_lifecycle: EventReader<BattleLifecycleEvent>,
     mut ev_battle_log: EventWriter<BattleLogEvent>,
     mut group_alive_query: Query<(&mut LifeState, &Group)>,
@@ -68,6 +68,9 @@ pub fn handle_lifecycle_event(
                     });
                     next_state.set(BattleState::BattleEnd)
                 } else {
+                    let res_queue = res_queue
+                        .as_mut()
+                        .expect("Turn ended before battle queue got initialized");
                     res_queue.queue.rotate_left(1);
                     let active_entity = res_queue.get_current();
                     let (_, group) = group_alive_query
