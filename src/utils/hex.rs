@@ -1,13 +1,31 @@
-use bevy::prelude::{IVec2, IVec3};
+use std::hash::{Hash, Hasher};
+
+use bevy::prelude::{IVec2, IVec3, Vec3};
 
 fn manhattan_distance(a: &IVec3, b: &IVec3) -> i32 {
     (a.x - b.x).abs() + (a.y - b.y).abs() + (a.z - b.z).abs()
 }
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Eq)]
 pub enum Hex {
     Oddr(IVec2),
     Cube(IVec3),
+}
+
+impl Hash for Hex {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.to_oddr().hash(state)
+    }
+}
+
+impl PartialEq for Hex {
+    fn eq(&self, other: &Self) -> bool {
+        self.to_oddr().eq(&other.to_oddr())
+    }
+}
+
+fn lerp(a: f32, b: f32, t: f32) -> f32 {
+    a + (b - a) * t
 }
 
 impl Hex {
@@ -15,10 +33,12 @@ impl Hex {
         Self::Oddr(pos)
     }
 
+    #[allow(dead_code)]
     pub fn from_cube(pos: IVec2) -> Self {
         Self::Cube(IVec3::new(pos.x, pos.y, -pos.x + pos.y))
     }
 
+    #[allow(dead_code)]
     pub fn to_oddr(self) -> IVec2 {
         match self {
             Self::Oddr(pos) => pos,
@@ -43,6 +63,37 @@ impl Hex {
 
     pub fn dist(&self, hex: Hex) -> i32 {
         manhattan_distance(&self.to_cube(), &hex.to_cube()) / 2
+    }
+
+    fn cube_lerp(a: Hex, b: Hex, t: f32) -> Vec3 {
+        let a = a.to_cube();
+        let b = b.to_cube();
+        (
+            lerp(a.x as f32, b.x as f32, t),
+            lerp(a.y as f32, b.y as f32, t),
+            lerp(a.z as f32, b.z as f32, t),
+        )
+            .into()
+    }
+
+    fn cube_round(frac: Vec3) -> Hex {
+        let mut qrs = frac.round();
+        let qrs_diff = (qrs - frac).abs();
+
+        if qrs_diff.x > -qrs_diff.y && qrs_diff.x > qrs_diff.z {
+            qrs.x = qrs.y - qrs.z;
+        } else if -qrs_diff.y > qrs_diff.z {
+            qrs.y = qrs.x + qrs.z;
+        }
+
+        Hex::from_cube((qrs.x as i32, qrs.y as i32).into())
+    }
+
+    pub fn line(self, end: Hex) -> Vec<Hex> {
+        let n = self.dist(end);
+        (0..=n)
+            .map(|i| Self::cube_round(Self::cube_lerp(self, end, i as f32 / n as f32)))
+            .collect()
     }
 }
 
@@ -111,5 +162,19 @@ mod tests {
                 z += 1;
             }
         }
+    }
+
+    #[test]
+    fn line_draw() {
+        let start = Hex::from_oddr((0, 0).into());
+        let end = Hex::from_oddr((5, 2).into());
+        let line = start.line(end);
+
+        let expected = [(0, 0), (1, 0), (1, 1), (2, 1), (3, 1), (4, 2), (5, 2)]
+            .into_iter()
+            .map(|p| Hex::from_oddr(p.into()))
+            .collect::<Vec<_>>();
+
+        assert_eq!(line, expected);
     }
 }

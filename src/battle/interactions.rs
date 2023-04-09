@@ -1,11 +1,12 @@
 use crate::{
-    abilities::{Ability, AbilityCastEvent, AbilityTargetType},
+    abilities::{Ability, AbilityTargetType, TurnEvent},
     character::{Abilities, CharacterName, Group},
-    utils::hex::Hex,
     GameState, HOVERED_BUTTON, NORMAL_BUTTON,
 };
-use bevy::prelude::*;
-use rand::seq::IteratorRandom;
+use bevy::{
+    ecs::query::{QueryIter, ReadOnlyWorldQuery},
+    prelude::*,
+};
 
 use super::{
     battle_field::{BattleField, Tile},
@@ -20,45 +21,12 @@ pub struct AbilityButton {
 #[derive(Resource)]
 pub struct ChosenAbility {
     ability: Ability,
+    allowed_targets: Vec<Entity>,
 }
 
 #[derive(Component)]
 pub struct Highlighted {
     color: Handle<ColorMaterial>,
-}
-
-pub fn handle_enemy_turn(
-    res_queue: ResMut<BattleQueue>,
-    query_abilities: Query<&Abilities>,
-    query_groups: Query<(&Group, &Parent)>,
-    mut ev_ability: EventWriter<AbilityCastEvent>,
-) {
-    let mut rng = rand::thread_rng();
-
-    let parent = query_groups
-        .iter()
-        .filter_map(|(group, parent)| (*group == Group::Player).then_some(parent))
-        .choose(&mut rng)
-        .expect("Couldn't find a player character");
-
-    let target = parent.get();
-
-    let active_entity = res_queue.get_current();
-
-    if let Ok(abilities) = query_abilities.get(active_entity) {
-        if let Some(ability) = abilities
-            .0
-            .iter()
-            .choose(&mut rng)
-            .map(|(_, ability)| ability)
-        {
-            ev_ability.send(AbilityCastEvent {
-                ability: ability.clone(),
-                by: active_entity,
-                on: target,
-            });
-        }
-    }
 }
 
 fn get_ability_range(
@@ -79,12 +47,41 @@ fn get_ability_range(
         .collect()
 }
 
+pub fn cancel_action(
+    mut commands: Commands,
+    mut materials: ResMut<Assets<ColorMaterial>>,
+    keys: Res<Input<KeyCode>>,
+    buttons: Res<Input<MouseButton>>,
+    mut colors_query: Query<(Entity, &mut Handle<ColorMaterial>), With<Tile>>,
+    mut next_state: ResMut<NextState<BattleState>>,
+) {
+    if keys.just_pressed(KeyCode::Escape) || buttons.just_pressed(MouseButton::Right) {
+        commands.remove_resource::<ChosenAbility>();
+        next_state.set(BattleState::AbilityChoosingPlayer);
+        clean_highlights(&mut commands, &mut materials, &mut colors_query.iter_mut());
+    }
+}
+
+fn clean_highlights<F>(
+    commands: &mut Commands,
+    materials: &mut ResMut<Assets<ColorMaterial>>,
+    iter: &mut QueryIter<(Entity, &mut Handle<ColorMaterial>), F>,
+) where
+    F: ReadOnlyWorldQuery,
+{
+    for (entity, mut color_handle) in iter {
+        commands.entity(entity).remove::<Highlighted>();
+
+        *color_handle = materials.add(ColorMaterial::from(Color::GRAY));
+    }
+}
+
 pub fn choose_target(
     mut commands: Commands,
     res_queue: ResMut<BattleQueue>,
     mut materials: ResMut<Assets<ColorMaterial>>,
     res_ability: Option<Res<ChosenAbility>>,
-    mut ev_ability: EventWriter<AbilityCastEvent>,
+    mut ev_ability: EventWriter<TurnEvent>,
     mut interaction_query: ParamSet<(
         Query<
             (
@@ -120,8 +117,13 @@ pub fn choose_target(
             })
             .unwrap_or(AbilityTargetType::Empty);
 
-        if let Some(ability) = res_ability.as_ref().map(|ca| &ca.ability) {
-            let is_valid = ability.target.contains(target_type);
+        if let Some(ChosenAbility {
+            ref ability,
+            ref allowed_targets,
+        }) = res_ability.as_ref().map(|res| res.as_ref())
+        {
+            let is_valid =
+                ability.target.contains(target_type) && allowed_targets.contains(&entity);
 
             match (*interaction, is_valid) {
                 (Interaction::Hovered, true) => {
@@ -131,7 +133,7 @@ pub fn choose_target(
                     *color_handle = materials.add(ColorMaterial::from(Color::RED));
                 }
                 (Interaction::Clicked, true) => {
-                    ev_ability.send(AbilityCastEvent {
+                    ev_ability.send(TurnEvent::Ability {
                         ability: ability.clone(),
                         by: res_queue.get_current(),
                         on: entity,
@@ -159,11 +161,11 @@ pub fn choose_target(
     }
 
     if should_unhighlight {
-        for (entity, mut color_handle) in interaction_query.p1().iter_mut() {
-            commands.entity(entity).remove::<Highlighted>();
-
-            *color_handle = materials.add(ColorMaterial::from(Color::GRAY));
-        }
+        clean_highlights(
+            &mut commands,
+            &mut materials,
+            &mut interaction_query.p1().iter_mut(),
+        );
     }
 }
 
@@ -183,7 +185,7 @@ pub fn choose_action(
     parent_query: Query<&Parent, With<CharacterName>>,
     mut next_state: ResMut<NextState<BattleState>>,
 ) {
-    let mut to_highlight = vec![];
+    let mut allowed_targets = vec![];
 
     for (interaction, mut color, ability_button) in &mut interaction_query.p0() {
         match *interaction {
@@ -205,7 +207,7 @@ pub fn choose_action(
                     .expect("Missing tile for player")
                     .get();
 
-                to_highlight = get_ability_range(
+                allowed_targets = get_ability_range(
                     chosen_ability,
                     player_tile,
                     battle_field.as_ref().expect("Missing battlefield"),
@@ -213,6 +215,7 @@ pub fn choose_action(
 
                 commands.insert_resource(ChosenAbility {
                     ability: chosen_ability.clone(),
+                    allowed_targets: allowed_targets.clone(),
                 });
 
                 next_state.set(BattleState::AbilityTargeting);
@@ -225,7 +228,7 @@ pub fn choose_action(
         }
     }
 
-    for tile in to_highlight {
+    for tile in allowed_targets {
         let mut color_query = interaction_query.p1();
 
         let mut color_handle = color_query

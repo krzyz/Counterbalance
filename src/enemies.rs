@@ -56,7 +56,7 @@ pub fn init_available_enemies(
                 CharacterBundle::new(
                     "mushroom",
                     Fungus,
-                    get_abilities(&["hit"], &abs).as_ref(),
+                    get_abilities(&["move", "hit"], &abs).as_ref(),
                     &[(HitPoints, 50), (Attack, 5), (Defense, 5)],
                     Group::Enemy,
                 ),
@@ -66,7 +66,7 @@ pub fn init_available_enemies(
                 CharacterBundle::new(
                     "wideshroom",
                     Fungus,
-                    get_abilities(&["slam"], &abs).as_ref(),
+                    get_abilities(&["move", "slam"], &abs).as_ref(),
                     &[(HitPoints, 50), (Attack, 7), (Defense, 3)],
                     Group::Enemy,
                 ),
@@ -76,7 +76,7 @@ pub fn init_available_enemies(
                 CharacterBundle::new(
                     "purpleshroom",
                     Fungus,
-                    get_abilities(&["hit"], &abs).as_ref(),
+                    get_abilities(&["move", "hit"], &abs).as_ref(),
                     &[(HitPoints, 50), (Attack, 7), (Defense, 3)],
                     Group::Enemy,
                 ),
@@ -86,7 +86,7 @@ pub fn init_available_enemies(
                 CharacterBundle::new(
                     "manyshroom",
                     Fungus,
-                    get_abilities(&["hit"], &abs).as_ref(),
+                    get_abilities(&["move", "hit"], &abs).as_ref(),
                     &[(HitPoints, 50), (Attack, 7), (Defense, 3)],
                     Group::Enemy,
                 ),

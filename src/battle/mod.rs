@@ -43,7 +43,9 @@ impl Plugin for BattlePlugin {
             .add_system(setup_battle.in_schedule(OnEnter(BattleInitState::AfterBattleField)))
             .add_systems((cleanup_battle, cleanup_battle_log).in_schedule(OnExit(AppState::Battle)))
             .add_system(choose_action.in_set(OnUpdate(BattleState::AbilityChoosingPlayer)))
-            .add_system(choose_target.in_set(OnUpdate(BattleState::AbilityTargeting)))
+            .add_systems(
+                (choose_target, cancel_action).in_set(OnUpdate(BattleState::AbilityTargeting)),
+            )
             .add_system(
                 setup_available_actions.in_schedule(OnEnter(BattleState::AbilityChoosingPlayer)),
             )
