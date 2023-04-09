@@ -14,7 +14,10 @@ mod utils;
 
 use abilities::AbilityPlugin;
 use available_abilities::init_available_abilities;
-use battle::{battle_field::BattleFieldLayout, BattlePlugin};
+use battle::{
+    battle_field::{BattleFieldLayout, Hex},
+    BattlePlugin,
+};
 use bevy::{core_pipeline::clear_color::ClearColorConfig, prelude::*};
 use bevy_prototype_lyon::prelude::*;
 use character::{
@@ -97,11 +100,11 @@ impl Default for GameState {
                 size: (12, 7).into(),
                 player_start: [(0, 3), (0, 0), (0, 6)]
                     .into_iter()
-                    .map(|p| p.into())
+                    .map(|p| Hex::from_oddr(p.into()))
                     .collect(),
                 enemy_start: [(10, 2), (10, 4), (11, 3), (11, 1), (11, 5)]
                     .into_iter()
-                    .map(|p| p.into())
+                    .map(|p| Hex::from_oddr(p.into()))
                     .collect(),
             },
         }

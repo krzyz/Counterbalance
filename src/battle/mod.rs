@@ -10,7 +10,7 @@ pub mod ui;
 use std::collections::VecDeque;
 
 use bevy::prelude::*;
-use bevy_mod_picking::DefaultPickingPlugins;
+use bevy_mod_picking::{InteractablePickingPlugin, PickingPlugin};
 
 use crate::{utils::bar::BarPlugin, AppState};
 
@@ -27,7 +27,8 @@ impl Plugin for BattlePlugin {
             .add_state::<BattleState>()
             .add_event::<BattleLogEvent>()
             .add_event::<BattleLifecycleEvent>()
-            .add_plugins(DefaultPickingPlugins)
+            .add_plugin(PickingPlugin)
+            .add_plugin(InteractablePickingPlugin)
             .add_plugin(BarPlugin)
             .add_systems(
                 (
@@ -51,7 +52,6 @@ impl Plugin for BattlePlugin {
                 (
                     resize_meshes_for_sprites,
                     resize_battle_camera_viewport,
-                    highlight_tile,
                     update_battle_log,
                     update_top_text,
                     handle_lifecycle_event,

@@ -1,12 +1,15 @@
 use crate::{
-    abilities::{Ability, AbilityCastEvent},
+    abilities::{Ability, AbilityCastEvent, AbilityTargetType},
     character::{Abilities, Group},
     GameState, HOVERED_BUTTON, NORMAL_BUTTON,
 };
 use bevy::prelude::*;
 use rand::seq::IteratorRandom;
 
-use super::{battle_field::Tile, Battle, BattleQueue, BattleState};
+use super::{
+    battle_field::{BattleField, Tile},
+    Battle, BattleQueue, BattleState,
+};
 
 #[derive(Component)]
 pub struct AbilityButton {
@@ -21,15 +24,18 @@ pub struct ChosenAbility {
 pub fn handle_enemy_turn(
     res_queue: ResMut<BattleQueue>,
     query_abilities: Query<&Abilities>,
-    query_groups: Query<(Entity, &Group)>,
+    query_groups: Query<(&Group, &Parent)>,
     mut ev_ability: EventWriter<AbilityCastEvent>,
 ) {
     let mut rng = rand::thread_rng();
 
-    let target = query_groups
+    let parent = query_groups
         .iter()
-        .filter_map(|(entity, group)| (*group == Group::Player).then_some(entity))
-        .choose(&mut rng);
+        .filter_map(|(group, parent)| (*group == Group::Player).then_some(parent))
+        .choose(&mut rng)
+        .expect("Couldn't find a player character");
+
+    let target = parent.get();
 
     let active_entity = res_queue.get_current();
 
@@ -40,31 +46,11 @@ pub fn handle_enemy_turn(
             .choose(&mut rng)
             .map(|(_, ability)| ability)
         {
-            if let Some(target) = target {
-                ev_ability.send(AbilityCastEvent {
-                    ability: ability.clone(),
-                    by: active_entity,
-                    on: vec![target],
-                });
-            }
-        }
-    }
-}
-
-pub fn highlight_tile(
-    mut materials: ResMut<Assets<ColorMaterial>>,
-    mut interaction_query: Query<
-        (&Interaction, &mut Handle<ColorMaterial>),
-        (Changed<Interaction>, With<Tile>),
-    >,
-) {
-    for (interaction, mut material) in interaction_query.iter_mut() {
-        match *interaction {
-            Interaction::Hovered => {
-                *material = materials.add(ColorMaterial::from(Color::LIME_GREEN))
-            }
-            Interaction::None => *material = materials.add(ColorMaterial::from(Color::GRAY)),
-            _ => (),
+            ev_ability.send(AbilityCastEvent {
+                ability: ability.clone(),
+                by: active_entity,
+                on: target,
+            });
         }
     }
 }
@@ -72,39 +58,64 @@ pub fn highlight_tile(
 pub fn choose_target(
     mut commands: Commands,
     res_queue: ResMut<BattleQueue>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
     res_ability: Option<Res<ChosenAbility>>,
     mut ev_ability: EventWriter<AbilityCastEvent>,
     mut interaction_query: Query<
-        (Entity, &Interaction, &Group, &mut Sprite),
-        (Changed<Interaction>, Without<Button>),
+        (
+            Entity,
+            &Interaction,
+            &mut Handle<ColorMaterial>,
+            Option<&Children>,
+        ),
+        (Changed<Interaction>, Without<Button>, With<Tile>),
     >,
+    group_query: Query<&Group, (Without<Button>, Without<Tile>)>,
     mut ability_buttons_query: Query<&mut BackgroundColor, (With<AbilityButton>, With<Button>)>,
 ) {
-    for (entity, interaction, group, mut sprite) in interaction_query.iter_mut() {
-        if *group == Group::Enemy {
-            match *interaction {
-                Interaction::Hovered => sprite.color = Color::rgba(0.7, 1.0, 0.7, 1.0),
-                Interaction::Clicked => {
-                    sprite.color = Color::default();
+    for (entity, interaction, mut color_handle, children) in interaction_query.iter_mut() {
+        let target_type = children
+            .and_then(|children| {
+                children.iter().next().and_then(|child| {
+                    match *group_query
+                        .get(*child)
+                        .expect("Missing group for a character on a tile")
+                    {
+                        Group::Player => Some(AbilityTargetType::Ally),
+                        Group::Enemy => Some(AbilityTargetType::Enemy),
+                    }
+                })
+            })
+            .unwrap_or(AbilityTargetType::Empty);
 
-                    if let Some(ability) = res_ability.as_ref().map(|r| &r.ability) {
-                        ev_ability.send(AbilityCastEvent {
-                            ability: ability.clone(),
-                            by: res_queue.get_current(),
-                            on: vec![entity],
-                        });
+        if let Some(ability) = res_ability.as_ref().map(|ca| &ca.ability) {
+            let is_valid = ability.target.contains(target_type);
 
-                        commands.remove_resource::<ChosenAbility>();
+            match (*interaction, is_valid) {
+                (Interaction::Hovered, true) => {
+                    *color_handle = materials.add(ColorMaterial::from(Color::LIME_GREEN));
+                }
+                (Interaction::Hovered, false) => {
+                    *color_handle = materials.add(ColorMaterial::from(Color::RED));
+                }
+                (Interaction::Clicked, true) => {
+                    ev_ability.send(AbilityCastEvent {
+                        ability: ability.clone(),
+                        by: res_queue.get_current(),
+                        on: entity,
+                    });
 
-                        for mut color in &mut ability_buttons_query {
-                            *color = NORMAL_BUTTON.into();
-                        }
+                    commands.remove_resource::<ChosenAbility>();
+
+                    for mut color in &mut ability_buttons_query {
+                        *color = NORMAL_BUTTON.into();
                     }
 
-                    break;
+                    *color_handle = materials.add(ColorMaterial::from(Color::GRAY));
                 }
-                Interaction::None => {
-                    sprite.color = Color::default();
+                (Interaction::Clicked, false) => (),
+                (Interaction::None, _) => {
+                    *color_handle = materials.add(ColorMaterial::from(Color::GRAY));
                 }
             }
         }
