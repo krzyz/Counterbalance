@@ -42,7 +42,11 @@ impl BattleField {
         self.tiles.get(&pos).copied()
     }
 
-    pub fn pos(&self, entity: Entity) -> Option<Hex> {
+    pub fn tiles(&self) -> &HashMap<Hex, Entity> {
+        &self.tiles
+    }
+
+    pub fn hex(&self, entity: Entity) -> Option<Hex> {
         self.rev_map.get(&entity).copied()
     }
 

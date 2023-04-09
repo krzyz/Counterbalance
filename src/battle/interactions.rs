@@ -1,6 +1,6 @@
 use crate::{
     abilities::{Ability, AbilityCastEvent, AbilityTargetType},
-    character::{Abilities, Group},
+    character::{Abilities, CharacterName, Group},
     utils::hex::Hex,
     GameState, HOVERED_BUTTON, NORMAL_BUTTON,
 };
@@ -20,6 +20,11 @@ pub struct AbilityButton {
 #[derive(Resource)]
 pub struct ChosenAbility {
     ability: Ability,
+}
+
+#[derive(Component)]
+pub struct Highlighted {
+    color: Handle<ColorMaterial>,
 }
 
 pub fn handle_enemy_turn(
@@ -56,7 +61,23 @@ pub fn handle_enemy_turn(
     }
 }
 
-fn get_ability_range(ability: &Ability, tile: Hex, battle_field: &BattleField) {}
+fn get_ability_range(
+    ability: &Ability,
+    target_tile: Entity,
+    battle_field: &BattleField,
+) -> Vec<Entity> {
+    battle_field
+        .tiles()
+        .iter()
+        .filter_map(|(hex, tile)| {
+            let target_hex = battle_field
+                .hex(target_tile)
+                .expect("Target hex not on the battle field");
+
+            (hex.dist(target_hex) <= ability.range).then_some(*tile)
+        })
+        .collect()
+}
 
 pub fn choose_target(
     mut commands: Commands,
@@ -64,19 +85,27 @@ pub fn choose_target(
     mut materials: ResMut<Assets<ColorMaterial>>,
     res_ability: Option<Res<ChosenAbility>>,
     mut ev_ability: EventWriter<AbilityCastEvent>,
-    mut interaction_query: Query<
-        (
-            Entity,
-            &Interaction,
-            &mut Handle<ColorMaterial>,
-            Option<&Children>,
-        ),
-        (Changed<Interaction>, Without<Button>, With<Tile>),
-    >,
+    mut interaction_query: ParamSet<(
+        Query<
+            (
+                Entity,
+                &Interaction,
+                &mut Handle<ColorMaterial>,
+                Option<&Children>,
+                Option<&Highlighted>,
+            ),
+            (Changed<Interaction>, Without<Button>, With<Tile>),
+        >,
+        Query<(Entity, &mut Handle<ColorMaterial>), With<Tile>>,
+    )>,
     group_query: Query<&Group, (Without<Button>, Without<Tile>)>,
     mut ability_buttons_query: Query<&mut BackgroundColor, (With<AbilityButton>, With<Button>)>,
 ) {
-    for (entity, interaction, mut color_handle, children) in interaction_query.iter_mut() {
+    let mut should_unhighlight = false;
+
+    for (entity, interaction, mut color_handle, children, highlighted) in
+        interaction_query.p0().iter_mut()
+    {
         let target_type = children
             .and_then(|children| {
                 children.iter().next().and_then(|child| {
@@ -114,13 +143,26 @@ pub fn choose_target(
                         *color = NORMAL_BUTTON.into();
                     }
 
-                    *color_handle = materials.add(ColorMaterial::from(Color::GRAY));
+                    should_unhighlight = true;
                 }
                 (Interaction::Clicked, false) => (),
-                (Interaction::None, _) => {
-                    *color_handle = materials.add(ColorMaterial::from(Color::GRAY));
-                }
+                (Interaction::None, _) => match highlighted {
+                    Some(Highlighted { color }) => {
+                        *color_handle = color.clone();
+                    }
+                    _ => {
+                        *color_handle = materials.add(ColorMaterial::from(Color::GRAY));
+                    }
+                },
             }
+        }
+    }
+
+    if should_unhighlight {
+        for (entity, mut color_handle) in interaction_query.p1().iter_mut() {
+            commands.entity(entity).remove::<Highlighted>();
+
+            *color_handle = materials.add(ColorMaterial::from(Color::GRAY));
         }
     }
 }
@@ -128,20 +170,27 @@ pub fn choose_target(
 pub fn choose_action(
     mut commands: Commands,
     res_queue: Res<BattleQueue>,
-    mut interaction_query: Query<
-        (&Interaction, &mut BackgroundColor, &AbilityButton),
-        (Changed<Interaction>, With<Button>),
-    >,
+    battle_field: Option<Res<BattleField>>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
+    mut interaction_query: ParamSet<(
+        Query<
+            (&Interaction, &mut BackgroundColor, &AbilityButton),
+            (Changed<Interaction>, With<Button>),
+        >,
+        Query<&mut Handle<ColorMaterial>, (Without<Button>, With<Tile>)>,
+    )>,
     abilities_query: Query<&Abilities, Without<Button>>,
+    parent_query: Query<&Parent, With<CharacterName>>,
     mut next_state: ResMut<NextState<BattleState>>,
 ) {
-    for (interaction, mut color, ability_button) in &mut interaction_query {
+    let mut to_highlight = vec![];
+
+    for (interaction, mut color, ability_button) in &mut interaction_query.p0() {
         match *interaction {
             Interaction::Hovered => {
                 *color = HOVERED_BUTTON.into();
             }
             Interaction::Clicked => {
-                //let abilities = get_abilities(res_queue.get_current(), &abilities_query);
                 let abilities = abilities_query
                     .get(res_queue.get_current())
                     .expect("Can't find abilities for active entity!");
@@ -149,7 +198,18 @@ pub fn choose_action(
                 let chosen_ability = abilities
                     .0
                     .get(&ability_button.ability_name)
-                    .expect("Ability chosen can't be found for the current active entity");
+                    .expect("Chosen ability can't be found for the current active entity");
+
+                let player_tile = parent_query
+                    .get(res_queue.get_current())
+                    .expect("Missing tile for player")
+                    .get();
+
+                to_highlight = get_ability_range(
+                    chosen_ability,
+                    player_tile,
+                    battle_field.as_ref().expect("Missing battlefield"),
+                );
 
                 commands.insert_resource(ChosenAbility {
                     ability: chosen_ability.clone(),
@@ -163,6 +223,21 @@ pub fn choose_action(
                 *color = NORMAL_BUTTON.into();
             }
         }
+    }
+
+    for tile in to_highlight {
+        let mut color_query = interaction_query.p1();
+
+        let mut color_handle = color_query
+            .get_mut(tile)
+            .expect("Missing entity to highlight");
+
+        let highlight_color = materials.add(ColorMaterial::from(Color::rgba(0.62, 1.0, 0.53, 1.0)));
+        commands.entity(tile).insert(Highlighted {
+            color: highlight_color.clone(),
+        });
+
+        *color_handle = highlight_color;
     }
 }
 
