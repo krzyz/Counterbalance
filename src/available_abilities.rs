@@ -48,7 +48,7 @@ pub fn init_available_abilities(
         },
     ]
     .into_iter()
-    .map(|ability| (ability.name.clone(), ability.clone()))
+    .map(|ability| (ability.name.clone(), ability))
     .collect();
 
     commands.insert_resource(AvailableAbilities(abilities));

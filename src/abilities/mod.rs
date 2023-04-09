@@ -6,7 +6,7 @@ use enumset::{EnumSet, EnumSetType};
 use crate::battle::battle_field::Tile;
 use crate::battle::lifecycle::BattleLifecycleEvent;
 use crate::battle::log::BattleLogEvent;
-use crate::character::{Attribute, AttributeType, Attributes, CharacterCategory, CharacterName};
+use crate::character::{Attribute, AttributeType, Attributes, CharacterName};
 use crate::AppState;
 
 pub struct AbilityPlugin;

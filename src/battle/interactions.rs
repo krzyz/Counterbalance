@@ -1,6 +1,7 @@
 use crate::{
     abilities::{Ability, AbilityCastEvent, AbilityTargetType},
     character::{Abilities, Group},
+    utils::hex::Hex,
     GameState, HOVERED_BUTTON, NORMAL_BUTTON,
 };
 use bevy::prelude::*;
@@ -54,6 +55,8 @@ pub fn handle_enemy_turn(
         }
     }
 }
+
+fn get_ability_range(ability: &Ability, tile: Hex, battle_field: &BattleField) {}
 
 pub fn choose_target(
     mut commands: Commands,

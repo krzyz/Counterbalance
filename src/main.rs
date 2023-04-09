@@ -14,10 +14,7 @@ mod utils;
 
 use abilities::AbilityPlugin;
 use available_abilities::init_available_abilities;
-use battle::{
-    battle_field::{BattleFieldLayout, Hex},
-    BattlePlugin,
-};
+use battle::{battle_field::BattleFieldLayout, BattlePlugin};
 use bevy::{core_pipeline::clear_color::ClearColorConfig, prelude::*};
 use bevy_prototype_lyon::prelude::*;
 use character::{
@@ -25,6 +22,7 @@ use character::{
 };
 use enemies::init_available_enemies;
 use main_menu::MainMenuPlugin;
+use utils::hex::Hex;
 
 pub const NORMAL_BUTTON: Color = Color::rgb(0.15, 0.15, 0.15);
 pub const HOVERED_BUTTON: Color = Color::rgb(0.25, 0.25, 0.25);
