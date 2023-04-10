@@ -47,14 +47,16 @@ pub fn setup_battle(
             Group::Enemy => &mut enemy_start,
         };
 
-        let tile_pos = start_tiles.pop_front().expect(&format!(
-            "Too few starting positions for group {:#?}",
-            character.bundle.group
-        ));
+        let tile_pos = start_tiles.pop_front().unwrap_or_else(|| {
+            panic!(
+                "Too few starting positions for group {:#?}",
+                character.bundle.group
+            )
+        });
 
         let tile = battle_field
             .tile(tile_pos)
-            .expect(&format!("Missing tile {:#?}", tile_pos));
+            .unwrap_or_else(|| panic!("Missing tile {:#?}", tile_pos));
 
         commands.entity(tile).with_children(|parent| {
             let id = parent
@@ -66,11 +68,11 @@ pub fn setup_battle(
                             images.get(&texture),
                             battle_field.tile_size(),
                         )),
-                        visibility: images
-                            .get(&texture)
-                            .is_some()
-                            .then_some(Visibility::Inherited)
-                            .unwrap_or(Visibility::Hidden),
+                        visibility: if images.get(&texture).is_some() {
+                            Visibility::Inherited
+                        } else {
+                            Visibility::Hidden
+                        },
                         ..default()
                     },
                     RenderLayers::layer(1),
@@ -114,31 +116,27 @@ pub fn resize_meshes_for_sprites(
     >,
 ) {
     for ev in ev_image_asset.iter() {
-        match ev {
-            AssetEvent::Created { handle } => {
-                for (mut mesh, mut transform, mut visibility) in
-                    query
-                        .iter_mut()
-                        .filter_map(|(q_handle, mesh, transform, visibility)| {
-                            (q_handle == handle).then_some((mesh, transform, visibility))
-                        })
-                {
-                    let image = images.get(&handle);
+        if let AssetEvent::Created { handle } = ev {
+            for (mut mesh, mut transform, mut visibility) in
+                query
+                    .iter_mut()
+                    .filter_map(|(q_handle, mesh, transform, visibility)| {
+                        (q_handle == handle).then_some((mesh, transform, visibility))
+                    })
+            {
+                let image = images.get(handle);
 
-                    let new_mesh = meshes.add(Mesh::from(shape::Quad::new(image.unwrap().size())));
-                    let old_mesh = mem::replace(&mut mesh.0, new_mesh);
+                let new_mesh = meshes.add(Mesh::from(shape::Quad::new(image.unwrap().size())));
+                let old_mesh = mem::replace(&mut mesh.0, new_mesh);
 
-                    meshes.remove(old_mesh);
+                meshes.remove(old_mesh);
 
-                    *visibility = Visibility::Inherited;
+                *visibility = Visibility::Inherited;
 
-                    if let Some(battle_field) = battle_field.as_ref().clone() {
-                        *transform =
-                            transform.with_scale(get_scaling(image, battle_field.tile_size()));
-                    }
+                if let Some(battle_field) = battle_field.as_ref() {
+                    *transform = transform.with_scale(get_scaling(image, battle_field.tile_size()));
                 }
             }
-            _ => (),
         }
     }
 }

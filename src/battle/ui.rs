@@ -141,8 +141,8 @@ pub fn setup_battle_ui(
             camera: Camera {
                 order: 1,
                 viewport: Some(get_viewport(
-                    window.resolution.width() as f32,
-                    window.resolution.height() as f32,
+                    window.resolution.width(),
+                    window.resolution.height(),
                     window.scale_factor(),
                 )),
                 ..default()

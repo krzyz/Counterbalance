@@ -39,7 +39,7 @@ impl BattleField {
     }
 
     pub fn tile(&self, pos: &Hex) -> Option<Entity> {
-        self.tiles.get(&pos).copied()
+        self.tiles.get(pos).copied()
     }
 
     pub fn tiles(&self) -> &HashMap<Hex, Entity> {
@@ -52,6 +52,20 @@ impl BattleField {
 
     pub fn tile_size(&self) -> f32 {
         self.tile_size
+    }
+
+    pub fn hexes_by_dist(&self, pos: &Hex, close_to: Option<Hex>) -> Vec<(i32, Hex)> {
+        let mut dists_to_hex = self
+            .tiles
+            .iter()
+            .map(|(h, _)| (pos.dist(*h), close_to.map(|pos2| pos2.dist(*h)), *h))
+            .collect::<Vec<_>>();
+
+        dists_to_hex.sort_by_key(|&(dist1, dist2, _)| (dist1, dist2));
+        dists_to_hex
+            .into_iter()
+            .map(|(dist, _, hex)| (dist, hex))
+            .collect()
     }
 }
 

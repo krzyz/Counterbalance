@@ -34,7 +34,7 @@ impl CharacterBundle {
             abilities: Abilities::from_arr(abilities),
             attributes: Attributes(
                 attributes
-                    .into_iter()
+                    .iter()
                     .copied()
                     .map(|(typ, value)| {
                         (
@@ -81,7 +81,7 @@ impl Abilities {
     pub fn from_arr(abilities: &[Ability]) -> Self {
         Self(
             abilities
-                .into_iter()
+                .iter()
                 .map(|ability| (ability.name.clone(), ability.clone()))
                 .collect(),
         )

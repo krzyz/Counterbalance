@@ -8,7 +8,10 @@ use crate::{
     GameState,
 };
 
-use super::{battle_field::BattleField, BattleQueue};
+use super::{
+    battle_field::{BattleField, Tile},
+    BattleQueue,
+};
 
 pub fn initialize_enemies(enemies: Res<AvailableEnemies>, mut game_state: ResMut<GameState>) {
     let mut rng = rand::thread_rng();
@@ -17,7 +20,7 @@ pub fn initialize_enemies(enemies: Res<AvailableEnemies>, mut game_state: ResMut
         .0
         .get(&EnemyTier::Normal1)
         .expect("Missing normal enemies!")
-        .into_iter()
+        .iter()
         .choose_multiple(&mut rng, 4)
         .into_iter()
     {
@@ -30,6 +33,7 @@ pub fn handle_enemy_turn(
     battle_field: Option<Res<BattleField>>,
     abilities_query: Query<&Abilities>,
     group_parent_query: Query<(&Group, &Parent)>,
+    tile_children_query: Query<&Children, With<Tile>>,
     mut ev_ability: EventWriter<TurnEvent>,
 ) {
     let mut rng = rand::thread_rng();
@@ -77,20 +81,24 @@ pub fn handle_enemy_turn(
                 .filter(|&ability| ability.target.contains(AbilityTargetType::Empty))
                 .collect::<Vec<_>>();
 
-            move_abilities.sort_by(|ab1, ab2| ab1.range.cmp(&ab2.range));
-
+            move_abilities.sort_by_key(|ab| ab.range);
             move_abilities.last().and_then(|&ability| {
-                player_hex
-                    .line(enemy_hex)
+                battle_field
+                    .hexes_by_dist(&player_hex, Some(enemy_hex))
                     .iter()
-                    .skip(1)
-                    .find(|&h| h.dist(enemy_hex) <= ability.range)
-                    .map(|h| (ability, *h))
+                    .find_map(|(_, move_target)| {
+                        move_target.line(enemy_hex).iter().skip(1).find_map(|&h| {
+                            let tile = battle_field.tile(&h).expect("Couldn't find tile");
+                            let tile_has_children = tile_children_query.get(tile).is_ok();
+                            (h.dist(enemy_hex) <= ability.range && !tile_has_children)
+                                .then_some((ability, h))
+                        })
+                    })
             })
         } {
             let hex_oddr = target_hex.to_oddr();
             info!("Target hex: {hex_oddr}");
-            let target_tile = battle_field.tile(&target_hex).expect("Couldn't find hex");
+            let target_tile = battle_field.tile(&target_hex).expect("Couldn't find tile");
 
             ev_ability.send(TurnEvent::Ability {
                 ability: ability.clone(),

@@ -105,13 +105,13 @@ pub fn choose_target(
     {
         let target_type = children
             .and_then(|children| {
-                children.iter().next().and_then(|child| {
+                children.iter().next().map(|child| {
                     match *group_query
                         .get(*child)
                         .expect("Missing group for a character on a tile")
                     {
-                        Group::Player => Some(AbilityTargetType::Ally),
-                        Group::Enemy => Some(AbilityTargetType::Enemy),
+                        Group::Player => AbilityTargetType::Ally,
+                        Group::Enemy => AbilityTargetType::Enemy,
                     }
                 })
             })

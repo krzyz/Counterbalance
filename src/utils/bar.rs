@@ -105,12 +105,12 @@ fn setup_bar(
                 ));
 
                 if let Some(layers) = render_layers {
-                    bar_inside.insert(layers.clone());
+                    bar_inside.insert(*layers);
                 }
             });
 
             if let Some(layers) = render_layers {
-                bar_entity.insert(layers.clone());
+                bar_entity.insert(*layers);
             }
         });
     }
@@ -128,31 +128,28 @@ fn correct_bar_position(
     mut transform_query: Query<(&mut Transform, &mut Visibility), Without<Bar>>,
 ) {
     for ev in ev_image_asset.iter() {
-        match ev {
-            AssetEvent::Created { handle } => {
-                for children in entity_query
-                    .iter()
-                    .filter_map(|(q_handle, children)| (q_handle == handle).then_some(children))
-                {
-                    let transform_entity = *children.first().expect("Expected bar to have a child");
-                    let (mut transform, mut visibility) = transform_query
-                        .get_mut(transform_entity)
-                        .expect("Missing transform");
+        if let AssetEvent::Created { handle } = ev {
+            for children in entity_query
+                .iter()
+                .filter_map(|(q_handle, children)| (q_handle == handle).then_some(children))
+            {
+                let transform_entity = *children.first().expect("Expected bar to have a child");
+                let (mut transform, mut visibility) = transform_query
+                    .get_mut(transform_entity)
+                    .expect("Missing transform");
 
-                    *transform = position_above_image(
-                        images.get(handle).expect("Wrong image asset created event"),
-                    );
+                *transform = position_above_image(
+                    images.get(handle).expect("Wrong image asset created event"),
+                );
 
-                    if let Some(battle_field) = battle_field.as_ref() {
-                        *transform = transform.with_scale(invert_scale(&get_scaling(
-                            images.get(handle),
-                            battle_field.tile_size(),
-                        )));
-                    }
-                    *visibility = Visibility::default();
+                if let Some(battle_field) = battle_field.as_ref() {
+                    *transform = transform.with_scale(invert_scale(&get_scaling(
+                        images.get(handle),
+                        battle_field.tile_size(),
+                    )));
                 }
+                *visibility = Visibility::default();
             }
-            _ => (),
         }
     }
 }
