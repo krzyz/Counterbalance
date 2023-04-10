@@ -139,6 +139,12 @@ pub enum Attribute {
 }
 
 impl Attribute {
+    pub fn get_value(&self) -> i32 {
+        match self {
+            Self::Value(v) => *v,
+            Self::Gauge { value, .. } => *value,
+        }
+    }
     pub fn value(value: i32) -> Self {
         Self::Value(value)
     }

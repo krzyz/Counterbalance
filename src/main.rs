@@ -79,6 +79,7 @@ pub struct MainCamera;
 pub struct GameState {
     characters: Vec<Character>,
     battle_field_layout: BattleFieldLayout,
+    round: i32,
 }
 
 impl Default for GameState {
@@ -105,6 +106,7 @@ impl Default for GameState {
                     .map(|p| Hex::from_oddr(p.into()))
                     .collect(),
             },
+            round: 1,
         }
     }
 }

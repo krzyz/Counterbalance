@@ -9,12 +9,16 @@ use crate::battle::log::BattleLogEvent;
 use crate::character::{Attribute, AttributeType, Attributes, CharacterName};
 use crate::AppState;
 
+use self::choose_ability_screen::{cleanup_ability_screen, setup_ability_screen};
+
 pub struct AbilityPlugin;
 
 impl Plugin for AbilityPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<TurnEvent>()
-            .add_system(resolve_ability.in_set(OnUpdate(AppState::Battle)));
+            .add_system(resolve_ability.in_set(OnUpdate(AppState::Battle)))
+            .add_system(setup_ability_screen.in_schedule(OnEnter(AppState::AbilityChoose)))
+            .add_system(cleanup_ability_screen.in_schedule(OnExit(AppState::AbilityChoose)));
     }
 }
 
@@ -93,6 +97,10 @@ fn move_char(
     commands.entity(where_to).push_children(&[who]);
 }
 
+fn calculate_damage(potency: i32, attack: i32, defense: i32) -> i32 {
+    potency * (1.1f32.powi(attack - defense)).round() as i32
+}
+
 fn resolve_ability(
     mut commands: Commands,
     battle_field: Option<Res<BattleField>>,
@@ -115,13 +123,12 @@ fn resolve_ability(
 
         match turn {
             TurnEvent::Ability { ability, by, on } => {
-                let caster_name = set
-                    .p1()
-                    .get(*by)
-                    .expect("Missing caster entity")
-                    .0
-                     .0
-                    .clone();
+                let char_query = set.p1();
+                let (caster_name, caster_attributes) =
+                    char_query.get(*by).expect("Missing caster entity");
+
+                let (caster_name, caster_attributes) =
+                    (caster_name.0.clone(), caster_attributes.clone());
 
                 let tile_query = set.p0();
                 let children = tile_query.get(*on).expect("Missing ability target");
@@ -163,17 +170,31 @@ fn resolve_ability(
                                     .expect("Expected an entity on a tile");
 
                                 let mut target_query = set.p2();
-                                let (name, mut attributes) = target_query
+                                let (name, mut target_attributes) = target_query
                                     .get_mut(entity)
                                     .expect("Didn't find target entity");
+                                let target_defense = target_attributes
+                                    .0
+                                    .get(&AttributeType::Defense)
+                                    .expect("Missing attack attribute")
+                                    .get_value();
 
-                                if let Some(attribute) = attributes.0.get_mut(&at_typ) {
+                                if let Some(attribute) = target_attributes.0.get_mut(&at_typ) {
                                     match attribute {
                                         Attribute::Value(v) => {
                                             *v -= potency;
                                         }
                                         Attribute::Gauge { value, min, max } => {
-                                            *value = (*value - potency).clamp(*min, *max);
+                                            let final_value = calculate_damage(
+                                                potency,
+                                                caster_attributes
+                                                    .0
+                                                    .get(&AttributeType::Attack)
+                                                    .expect("Missing attack attribute")
+                                                    .get_value(),
+                                                target_defense,
+                                            );
+                                            *value = (*value - final_value).clamp(*min, *max);
 
                                             ev_battle_log.send(BattleLogEvent {
                                                 message: format!(

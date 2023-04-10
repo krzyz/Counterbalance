@@ -16,12 +16,14 @@ use super::{
 pub fn initialize_enemies(enemies: Res<AvailableEnemies>, mut game_state: ResMut<GameState>) {
     let mut rng = rand::thread_rng();
 
+    let number_of_enemies = (game_state.round / 4).clamp(1, 4);
+
     for enemy in enemies
         .0
         .get(&EnemyTier::Normal1)
         .expect("Missing normal enemies!")
         .iter()
-        .choose_multiple(&mut rng, 4)
+        .choose_multiple(&mut rng, number_of_enemies as usize)
         .into_iter()
     {
         game_state.characters.push(enemy.clone());

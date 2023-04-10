@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::{character::Group, AppState, HOVERED_BUTTON, NORMAL_BUTTON};
+use crate::{character::Group, AppState, GameState, HOVERED_BUTTON, NORMAL_BUTTON};
 
 use super::Battle;
 
@@ -16,6 +16,7 @@ pub enum BattleResolutionButton {
 }
 
 pub fn battle_resolution_button_interaction(
+    mut game_state: ResMut<GameState>,
     mut interaction_query: Query<
         (&Interaction, &BattleResolutionButton, &mut BackgroundColor),
         (Changed<Interaction>, With<Button>),
@@ -31,8 +32,14 @@ pub fn battle_resolution_button_interaction(
                 *color = NORMAL_BUTTON.into();
             }
             Interaction::Clicked => match button {
-                BattleResolutionButton::MainMenu => next_state.set(AppState::MainMenu),
-                BattleResolutionButton::Continue => next_state.set(AppState::AbilityChoose),
+                BattleResolutionButton::MainMenu => {
+                    *game_state = GameState::default();
+                    next_state.set(AppState::MainMenu);
+                }
+                BattleResolutionButton::Continue => {
+                    game_state.round += 1;
+                    next_state.set(AppState::AbilityChoose);
+                }
             },
         }
     }
