@@ -139,7 +139,7 @@ pub fn setup_battle_ui(
     commands.spawn((
         Camera2dBundle {
             camera: Camera {
-                order: 1,
+                order: -1,
                 viewport: Some(get_viewport(
                     window.resolution.width(),
                     window.resolution.height(),

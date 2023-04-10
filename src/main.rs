@@ -110,10 +110,21 @@ impl Default for GameState {
 }
 
 fn setup(mut commands: Commands) {
+    commands.spawn((Camera2dBundle {
+        camera: Camera {
+            order: -100,
+            ..default()
+        },
+        camera_2d: Camera2d {
+            clear_color: ClearColorConfig::Custom(Color::BLACK),
+        },
+        ..default()
+    },));
+
     commands.spawn((
         Camera2dBundle {
             camera_2d: Camera2d {
-                clear_color: ClearColorConfig::Custom(Color::BLACK),
+                clear_color: ClearColorConfig::None,
             },
             ..default()
         },
