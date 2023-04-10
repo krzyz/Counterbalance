@@ -88,16 +88,18 @@ pub fn handle_enemy_turn(
                     .iter()
                     .find_map(|(_, move_target)| {
                         move_target.line(enemy_hex).iter().skip(1).find_map(|&h| {
-                            let tile = battle_field.tile(&h).expect("Couldn't find tile");
-                            let tile_has_children = tile_children_query.get(tile).is_ok();
-                            (h.dist(enemy_hex) <= ability.range && !tile_has_children)
-                                .then_some((ability, h))
+                            battle_field
+                                .in_range_and_empty(
+                                    enemy_hex,
+                                    h,
+                                    ability.range,
+                                    &tile_children_query,
+                                )
+                                .map(|_| (ability, h))
                         })
                     })
             })
         } {
-            let hex_oddr = target_hex.to_oddr();
-            info!("Target hex: {hex_oddr}");
             let target_tile = battle_field.tile(&target_hex).expect("Couldn't find tile");
 
             ev_ability.send(TurnEvent::Ability {

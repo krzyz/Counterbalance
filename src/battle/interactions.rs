@@ -1,5 +1,5 @@
 use crate::{
-    abilities::{Ability, AbilityTargetType, TurnEvent},
+    abilities::{Ability, AbilityProximity, AbilityTargetType, AbilityType, TurnEvent},
     character::{Abilities, CharacterName, Group},
     GameState, HOVERED_BUTTON, NORMAL_BUTTON,
 };
@@ -7,6 +7,7 @@ use bevy::{
     ecs::query::{QueryIter, ReadOnlyWorldQuery},
     prelude::*,
 };
+use bevy_mod_picking::PickableBundle;
 
 use super::{
     battle_field::{BattleField, Tile},
@@ -31,18 +32,38 @@ pub struct Highlighted {
 
 fn get_ability_range(
     ability: &Ability,
-    target_tile: Entity,
+    caster_tile: Entity,
     battle_field: &BattleField,
+    tile_children_query: &Query<&Children, With<Tile>>,
 ) -> Vec<Entity> {
     battle_field
         .tiles()
         .iter()
-        .filter_map(|(hex, tile)| {
-            let target_hex = battle_field
-                .hex(target_tile)
-                .expect("Target hex not on the battle field");
+        .filter_map(|(target_hex, tile)| {
+            let caster_hex = battle_field
+                .hex(caster_tile)
+                .expect("Caster hex not on the battle field");
 
-            (hex.dist(target_hex) <= ability.range).then_some(*tile)
+            if target_hex.dist(caster_hex) <= ability.range {
+                if let AbilityType::Targeted {
+                    ab_typ: _,
+                    proximity: AbilityProximity::Melee,
+                } = ability.typ
+                {
+                    battle_field
+                        .get_in_range_and_empty(
+                            *target_hex,
+                            caster_hex,
+                            ability.range,
+                            tile_children_query,
+                        )
+                        .map(|_| *tile)
+                } else {
+                    Some(*tile)
+                }
+            } else {
+                None
+            }
         })
         .collect()
 }
@@ -183,6 +204,7 @@ pub fn choose_action(
     )>,
     abilities_query: Query<&Abilities, Without<Button>>,
     parent_query: Query<&Parent, With<CharacterName>>,
+    tile_children_query: Query<&Children, With<Tile>>,
     mut next_state: ResMut<NextState<BattleState>>,
 ) {
     let mut allowed_targets = vec![];
@@ -211,6 +233,7 @@ pub fn choose_action(
                     chosen_ability,
                     player_tile,
                     battle_field.as_ref().expect("Missing battlefield"),
+                    &tile_children_query,
                 );
 
                 commands.insert_resource(ChosenAbility {
@@ -319,4 +342,16 @@ pub fn cleanup_battle(
     game_state
         .characters
         .retain(|char| char.bundle.group == Group::Player);
+}
+
+pub fn init_targeting(mut commands: Commands, char_query: Query<Entity, With<CharacterName>>) {
+    for chara in char_query.iter() {
+        commands.entity(chara).remove::<PickableBundle>();
+    }
+}
+
+pub fn cleanup_targeting(mut commands: Commands, char_query: Query<Entity, With<CharacterName>>) {
+    for chara in char_query.iter() {
+        commands.entity(chara).insert(PickableBundle::default());
+    }
 }

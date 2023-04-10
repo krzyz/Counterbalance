@@ -67,6 +67,32 @@ impl BattleField {
             .map(|(dist, _, hex)| (dist, hex))
             .collect()
     }
+
+    pub fn in_range_and_empty(
+        &self,
+        from: Hex,
+        hex: Hex,
+        range: i32,
+        tile_children_query: &Query<&Children, With<Tile>>,
+    ) -> Option<Entity> {
+        let tile = self.tile(&hex).expect("Couldn't find tile");
+        let tile_has_children = tile_children_query.get(tile).is_ok();
+        (from.dist(hex) <= range && !tile_has_children).then_some(tile)
+    }
+
+    pub fn get_in_range_and_empty(
+        &self,
+        target_hex: Hex,
+        caster_hex: Hex,
+        range: i32,
+        tile_children_query: &Query<&Children, With<Tile>>,
+    ) -> Option<Entity> {
+        self.hexes_by_dist(&target_hex, Some(caster_hex))
+            .iter()
+            .find_map(|(_, hex)| {
+                self.in_range_and_empty(caster_hex, *hex, range, tile_children_query)
+            })
+    }
 }
 
 pub fn setup_battle_field(

@@ -43,7 +43,6 @@ pub fn init_available_enemies(
 
     player.bundle.abilities = Abilities::from_arr(get_abilities(&["move", "hit"], &abs).as_ref());
 
-    info!("Starting enemies init");
     use AttributeType::*;
     use CharacterCategory::*;
 

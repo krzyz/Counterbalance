@@ -1,5 +1,5 @@
 use crate::{
-    abilities::{Ability, AbilityTargetType, AbilityType},
+    abilities::{Ability, AbilityProximity, AbilityTargetType, AbilityType, TargetedAbilityType},
     character::AttributeType,
     InitState,
 };
@@ -28,19 +28,38 @@ pub fn init_available_abilities(
         },
         Ability {
             name: "hit".to_string(),
-            typ: AbilityType::ChangeAttribute {
-                typ: AttributeType::HitPoints,
-                potency: 15,
+            typ: AbilityType::Targeted {
+                ab_typ: TargetedAbilityType::ChangeAttribute {
+                    at_typ: AttributeType::HitPoints,
+                    potency: 15,
+                },
+                proximity: AbilityProximity::Melee,
             },
             target: AbilityTargetType::Enemy.into(),
             range: 2,
             side_effect: None,
         },
         Ability {
+            name: "shoot".to_string(),
+            typ: AbilityType::Targeted {
+                ab_typ: TargetedAbilityType::ChangeAttribute {
+                    at_typ: AttributeType::HitPoints,
+                    potency: 1,
+                },
+                proximity: AbilityProximity::Ranged,
+            },
+            target: AbilityTargetType::Enemy.into(),
+            range: 5,
+            side_effect: None,
+        },
+        Ability {
             name: "slam".to_string(),
-            typ: AbilityType::ChangeAttribute {
-                typ: AttributeType::HitPoints,
-                potency: 20,
+            typ: AbilityType::Targeted {
+                ab_typ: TargetedAbilityType::ChangeAttribute {
+                    at_typ: AttributeType::HitPoints,
+                    potency: 20,
+                },
+                proximity: AbilityProximity::Ranged,
             },
             target: AbilityTargetType::Enemy.into(),
             range: 1,

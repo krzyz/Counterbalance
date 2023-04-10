@@ -37,6 +37,12 @@ pub struct Ability {
     pub side_effect: Option<Box<Ability>>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AbilityProximity {
+    Melee,
+    Ranged,
+}
+
 #[derive(EnumSetType, Debug)]
 pub enum AbilityTargetType {
     Empty,
@@ -46,8 +52,45 @@ pub enum AbilityTargetType {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AbilityType {
-    ChangeAttribute { typ: AttributeType, potency: i32 },
+    Targeted {
+        ab_typ: TargetedAbilityType,
+        proximity: AbilityProximity,
+    },
     Movement,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TargetedAbilityType {
+    ChangeAttribute { at_typ: AttributeType, potency: i32 },
+}
+
+fn move_char(
+    who: Entity,
+    where_to: Entity,
+    battle_field: &BattleField,
+    caster_name: &str,
+    commands: &mut Commands,
+    parent_query: &mut Query<&mut Parent, With<CharacterName>>,
+    ev_battle_log: &mut EventWriter<BattleLogEvent>,
+) {
+    let caster_tile = parent_query.get(who).expect("Missing player tile").get();
+
+    let caster_hex = battle_field
+        .hex(caster_tile)
+        .expect("Missing hex for caster")
+        .to_oddr();
+    let target_hex = battle_field
+        .hex(where_to)
+        .expect("Missing hex for target")
+        .to_oddr();
+
+    ev_battle_log.send(BattleLogEvent {
+        message: format!(
+            "{caster_name} moved from ({}, {}) to ({}, {})",
+            caster_hex.x, caster_hex.y, target_hex.x, target_hex.y
+        ),
+    });
+    commands.entity(where_to).push_children(&[who]);
 }
 
 fn resolve_ability(
@@ -60,10 +103,16 @@ fn resolve_ability(
         Query<Option<&Children>, With<Tile>>,
         Query<(&CharacterName, &mut Attributes)>,
         Query<(&CharacterName, &mut Attributes)>,
-        Query<&mut Parent, With<CharacterName>>,
     )>,
+    mut parent_query: Query<&mut Parent, With<CharacterName>>,
+    tile_children_query: Query<&Children, With<Tile>>,
 ) {
     for turn in ev_ability.iter() {
+        let battle_field = battle_field
+            .as_ref()
+            .expect("Missing battle field")
+            .as_ref();
+
         match turn {
             TurnEvent::Ability { ability, by, on } => {
                 let caster_name = set
@@ -78,64 +127,82 @@ fn resolve_ability(
                 let children = tile_query.get(*on).expect("Missing ability target");
 
                 match ability.typ {
-                    AbilityType::ChangeAttribute { typ, potency } => {
-                        let entity = *children
-                            .expect("Expected children on a tile")
-                            .iter()
-                            .next()
-                            .expect("Expected an entity on a tile");
+                    AbilityType::Targeted { ab_typ, proximity } => {
+                        if let AbilityProximity::Melee = proximity {
+                            let from_tile =
+                                parent_query.get(*by).expect("Missing caster tile").get();
+                            let from = battle_field.hex(from_tile).expect("Caster hex not found");
+                            let hex = battle_field.hex(*on).expect("Target hex not found");
+                            if from.dist(hex) > 1 {
+                                let where_to = battle_field
+                                    .get_in_range_and_empty(
+                                        hex,
+                                        from,
+                                        ability.range,
+                                        &tile_children_query,
+                                    )
+                                    .expect("Couldn't find place for the entity to move to");
 
-                        let mut target_query = set.p2();
-                        let (name, mut attributes) = target_query
-                            .get_mut(entity)
-                            .expect("Didn't find target entity");
+                                move_char(
+                                    *by,
+                                    where_to,
+                                    battle_field,
+                                    caster_name.as_str(),
+                                    &mut commands,
+                                    &mut parent_query,
+                                    &mut ev_battle_log,
+                                );
+                            }
+                        }
+                        match ab_typ {
+                            TargetedAbilityType::ChangeAttribute { at_typ, potency } => {
+                                let entity = *children
+                                    .expect("Expected children on a tile")
+                                    .iter()
+                                    .next()
+                                    .expect("Expected an entity on a tile");
 
-                        if let Some(attribute) = attributes.0.get_mut(&typ) {
-                            match attribute {
-                                Attribute::Value(v) => {
-                                    *v -= potency;
-                                }
-                                Attribute::Gauge { value, min, max } => {
-                                    *value = (*value - potency).clamp(*min, *max);
+                                let mut target_query = set.p2();
+                                let (name, mut attributes) = target_query
+                                    .get_mut(entity)
+                                    .expect("Didn't find target entity");
 
-                                    ev_battle_log.send(BattleLogEvent {
-                                        message: format!(
-                                            "{caster_name} used {} on {}. Hp removed to: {}",
-                                            ability.name, name.0, *value
-                                        ),
-                                    });
+                                if let Some(attribute) = attributes.0.get_mut(&at_typ) {
+                                    match attribute {
+                                        Attribute::Value(v) => {
+                                            *v -= potency;
+                                        }
+                                        Attribute::Gauge { value, min, max } => {
+                                            *value = (*value - potency).clamp(*min, *max);
 
-                                    if typ == AttributeType::HitPoints && *value <= 0 {
-                                        ev_lifecycle
-                                            .send(BattleLifecycleEvent::CharacterDied(entity))
+                                            ev_battle_log.send(BattleLogEvent {
+                                                message: format!(
+                                                "{caster_name} used {} on {}. Hp removed to: {}",
+                                                ability.name, name.0, *value
+                                            ),
+                                            });
+
+                                            if at_typ == AttributeType::HitPoints && *value <= 0 {
+                                                ev_lifecycle.send(
+                                                    BattleLifecycleEvent::CharacterDied(entity),
+                                                )
+                                            }
+                                        }
                                     }
                                 }
                             }
                         }
                     }
                     AbilityType::Movement => {
-                        let caster_tile = set.p3().get(*by).expect("Missing player tile").get();
-                        let battle_field = battle_field
-                            .as_ref()
-                            .expect("Missing battle field")
-                            .as_ref();
-
-                        let caster_hex = battle_field
-                            .hex(caster_tile)
-                            .expect("Missing hex for caster")
-                            .to_oddr();
-                        let target_hex = battle_field
-                            .hex(*on)
-                            .expect("Missing hex for target")
-                            .to_oddr();
-
-                        ev_battle_log.send(BattleLogEvent {
-                            message: format!(
-                                "{caster_name} moved from ({}, {}) to ({}, {})",
-                                caster_hex.x, caster_hex.y, target_hex.x, target_hex.y
-                            ),
-                        });
-                        commands.entity(*on).push_children(&[*by]);
+                        move_char(
+                            *by,
+                            *on,
+                            battle_field,
+                            caster_name.as_str(),
+                            &mut commands,
+                            &mut parent_query,
+                            &mut ev_battle_log,
+                        );
                     }
                 }
             }
