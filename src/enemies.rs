@@ -17,6 +17,14 @@ pub enum EnemyTier {
 #[derive(Resource, Debug)]
 pub struct AvailableEnemies(pub HashMap<EnemyTier, Vec<Character>>);
 
+pub fn get_ability(name: &str, available_abilities: &Res<AvailableAbilities>) -> Ability {
+    available_abilities
+        .0
+        .get(name)
+        .expect("Can't find the ability during init!")
+        .clone()
+}
+
 pub fn get_abilities(
     names: &[&str],
     available_abilities: &Res<AvailableAbilities>,
@@ -24,13 +32,7 @@ pub fn get_abilities(
     names
         .iter()
         .map(|name| name.to_string())
-        .map(|name| {
-            available_abilities
-                .0
-                .get(&name)
-                .expect("Can't find the ability during init!")
-                .clone()
-        })
+        .map(|name| get_ability(name.as_str(), available_abilities))
         .collect()
 }
 
@@ -66,7 +68,7 @@ pub fn init_available_enemies(
                     "wideshroom",
                     Fungus,
                     get_abilities(&["move", "slam"], &abs).as_ref(),
-                    &[(HitPoints, 50), (Attack, 7), (Defense, 3)],
+                    &[(HitPoints, 60), (Attack, 3), (Defense, 7)],
                     Group::Enemy,
                 ),
                 "images/fungus2.png",
@@ -75,8 +77,8 @@ pub fn init_available_enemies(
                 CharacterBundle::new(
                     "purpleshroom",
                     Fungus,
-                    get_abilities(&["move", "hit"], &abs).as_ref(),
-                    &[(HitPoints, 50), (Attack, 7), (Defense, 3)],
+                    get_abilities(&["move", "shoot"], &abs).as_ref(),
+                    &[(HitPoints, 30), (Attack, 7), (Defense, 3)],
                     Group::Enemy,
                 ),
                 "images/fungus3.png",
@@ -86,7 +88,7 @@ pub fn init_available_enemies(
                     "manyshroom",
                     Fungus,
                     get_abilities(&["move", "hit"], &abs).as_ref(),
-                    &[(HitPoints, 50), (Attack, 7), (Defense, 3)],
+                    &[(HitPoints, 60), (Attack, 5), (Defense, 4)],
                     Group::Enemy,
                 ),
                 "images/fungus4.png",

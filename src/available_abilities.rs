@@ -21,49 +21,45 @@ pub fn init_available_abilities(
     let abilities = vec![
         Ability {
             name: "move".to_string(),
-            typ: AbilityType::Movement,
+            r#type: AbilityType::Movement,
             target: AbilityTargetType::Empty.into(),
             range: 5,
-            side_effect: None,
         },
         Ability {
             name: "hit".to_string(),
-            typ: AbilityType::Targeted {
-                ab_typ: TargetedAbilityType::ChangeAttribute {
-                    at_typ: AttributeType::HitPoints,
+            r#type: AbilityType::Targeted {
+                ab_type: TargetedAbilityType::ChangeAttribute {
+                    at_type: AttributeType::HitPoints,
                     potency: 15,
                 },
                 proximity: AbilityProximity::Melee,
             },
             target: AbilityTargetType::Enemy.into(),
             range: 2,
-            side_effect: None,
         },
         Ability {
             name: "shoot".to_string(),
-            typ: AbilityType::Targeted {
-                ab_typ: TargetedAbilityType::ChangeAttribute {
-                    at_typ: AttributeType::HitPoints,
-                    potency: 1,
+            r#type: AbilityType::Targeted {
+                ab_type: TargetedAbilityType::ChangeAttribute {
+                    at_type: AttributeType::HitPoints,
+                    potency: 10,
                 },
                 proximity: AbilityProximity::Ranged,
             },
             target: AbilityTargetType::Enemy.into(),
             range: 5,
-            side_effect: None,
         },
         Ability {
             name: "slam".to_string(),
-            typ: AbilityType::Targeted {
-                ab_typ: TargetedAbilityType::ChangeAttribute {
-                    at_typ: AttributeType::HitPoints,
+            r#type: AbilityType::Targeted {
+                ab_type: TargetedAbilityType::ChangeAttribute {
+                    at_type: AttributeType::HitPoints,
                     potency: 20,
                 },
                 proximity: AbilityProximity::Ranged,
             },
             target: AbilityTargetType::Enemy.into(),
             range: 1,
-            side_effect: None,
         },
     ]
     .into_iter()

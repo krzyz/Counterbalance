@@ -46,9 +46,9 @@ fn get_ability_range(
 
             if target_hex.dist(caster_hex) <= ability.range {
                 if let AbilityType::Targeted {
-                    ab_typ: _,
+                    ab_type: _,
                     proximity: AbilityProximity::Melee,
-                } = ability.typ
+                } = ability.r#type
                 {
                     battle_field
                         .get_in_range_and_empty(

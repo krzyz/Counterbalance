@@ -3,7 +3,7 @@ use rand::seq::IteratorRandom;
 
 use crate::{
     abilities::{AbilityTargetType, TurnEvent},
-    character::{Abilities, Group},
+    character::{Abilities, Attribute, Group},
     enemies::{AvailableEnemies, EnemyTier},
     GameState,
 };
@@ -16,7 +16,7 @@ use super::{
 pub fn initialize_enemies(enemies: Res<AvailableEnemies>, mut game_state: ResMut<GameState>) {
     let mut rng = rand::thread_rng();
 
-    let number_of_enemies = (game_state.round / 4).clamp(1, 4);
+    let number_of_enemies = (game_state.round / 8 + 1).clamp(1, 4);
 
     for enemy in enemies
         .0
@@ -26,6 +26,22 @@ pub fn initialize_enemies(enemies: Res<AvailableEnemies>, mut game_state: ResMut
         .choose_multiple(&mut rng, number_of_enemies as usize)
         .into_iter()
     {
+        let mut enemy = enemy.clone();
+
+        let power_multiplier = 1.02f32.powi(game_state.round);
+
+        for (_, val) in enemy.bundle.attributes.0.iter_mut() {
+            match val {
+                Attribute::Value(v) => {
+                    *v = (*v as f32 * power_multiplier).round() as i32;
+                }
+                Attribute::Gauge { value, max, .. } => {
+                    *value = (*value as f32 * power_multiplier).round() as i32;
+                    *max = (*max as f32 * power_multiplier).round() as i32;
+                }
+            };
+        }
+
         game_state.characters.push(enemy.clone());
     }
 }

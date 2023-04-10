@@ -9,7 +9,9 @@ use crate::battle::log::BattleLogEvent;
 use crate::character::{Attribute, AttributeType, Attributes, CharacterName};
 use crate::AppState;
 
-use self::choose_ability_screen::{cleanup_ability_screen, setup_ability_screen};
+use self::choose_ability_screen::{
+    cleanup_ability_screen, interact_pick_power_up, setup_ability_screen,
+};
 
 pub struct AbilityPlugin;
 
@@ -17,6 +19,7 @@ impl Plugin for AbilityPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<TurnEvent>()
             .add_system(resolve_ability.in_set(OnUpdate(AppState::Battle)))
+            .add_system(interact_pick_power_up.in_set(OnUpdate(AppState::AbilityChoose)))
             .add_system(setup_ability_screen.in_schedule(OnEnter(AppState::AbilityChoose)))
             .add_system(cleanup_ability_screen.in_schedule(OnExit(AppState::AbilityChoose)));
     }
@@ -35,10 +38,9 @@ pub enum TurnEvent {
 #[derive(Debug, Clone)]
 pub struct Ability {
     pub name: String,
-    pub typ: AbilityType,
+    pub r#type: AbilityType,
     pub target: EnumSet<AbilityTargetType>,
     pub range: i32,
-    pub side_effect: Option<Box<Ability>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -57,7 +59,7 @@ pub enum AbilityTargetType {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AbilityType {
     Targeted {
-        ab_typ: TargetedAbilityType,
+        ab_type: TargetedAbilityType,
         proximity: AbilityProximity,
     },
     Movement,
@@ -65,7 +67,10 @@ pub enum AbilityType {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TargetedAbilityType {
-    ChangeAttribute { at_typ: AttributeType, potency: i32 },
+    ChangeAttribute {
+        at_type: AttributeType,
+        potency: i32,
+    },
 }
 
 fn move_char(
@@ -98,7 +103,7 @@ fn move_char(
 }
 
 fn calculate_damage(potency: i32, attack: i32, defense: i32) -> i32 {
-    potency * (1.1f32.powi(attack - defense)).round() as i32
+    potency * (1.05f32.powi(attack - defense)).round() as i32
 }
 
 fn resolve_ability(
@@ -133,8 +138,8 @@ fn resolve_ability(
                 let tile_query = set.p0();
                 let children = tile_query.get(*on).expect("Missing ability target");
 
-                match ability.typ {
-                    AbilityType::Targeted { ab_typ, proximity } => {
+                match ability.r#type {
+                    AbilityType::Targeted { ab_type, proximity } => {
                         if let AbilityProximity::Melee = proximity {
                             let from_tile =
                                 parent_query.get(*by).expect("Missing caster tile").get();
@@ -161,8 +166,8 @@ fn resolve_ability(
                                 );
                             }
                         }
-                        match ab_typ {
-                            TargetedAbilityType::ChangeAttribute { at_typ, potency } => {
+                        match ab_type {
+                            TargetedAbilityType::ChangeAttribute { at_type, potency } => {
                                 let entity = *children
                                     .expect("Expected children on a tile")
                                     .iter()
@@ -179,7 +184,7 @@ fn resolve_ability(
                                     .expect("Missing attack attribute")
                                     .get_value();
 
-                                if let Some(attribute) = target_attributes.0.get_mut(&at_typ) {
+                                if let Some(attribute) = target_attributes.0.get_mut(&at_type) {
                                     match attribute {
                                         Attribute::Value(v) => {
                                             *v -= potency;
@@ -198,12 +203,12 @@ fn resolve_ability(
 
                                             ev_battle_log.send(BattleLogEvent {
                                                 message: format!(
-                                                "{caster_name} used {} on {}. Hp removed to: {}",
-                                                ability.name, name.0, *value
+                                                "{caster_name} used {} on {}, dealing {final_value} dmg. {} HP changed to: {}",
+                                                ability.name, name.0, name.0, *value
                                             ),
                                             });
 
-                                            if at_typ == AttributeType::HitPoints && *value <= 0 {
+                                            if at_type == AttributeType::HitPoints && *value <= 0 {
                                                 ev_lifecycle.send(
                                                     BattleLifecycleEvent::CharacterDied(entity),
                                                 )

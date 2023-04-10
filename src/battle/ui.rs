@@ -17,7 +17,7 @@ use super::{
 };
 
 const BOTTOM_PANE_HEIGHT: f32 = 150.0;
-const RIGHT_PANE_WIDTH: f32 = 200.0;
+const RIGHT_PANE_WIDTH: f32 = 220.0;
 
 #[derive(Component)]
 pub struct TopText;
@@ -79,6 +79,8 @@ pub fn build_right_pane(parent: &mut ChildBuilder, asset_server: &Res<AssetServe
                                 },
                             )
                             .with_style(Style {
+                                max_size: Size::width(Val::Px(RIGHT_PANE_WIDTH - 10.0)),
+                                flex_wrap: FlexWrap::Wrap,
                                 margin: UiRect::all(Val::Px(5.0)),
                                 ..default()
                             }),

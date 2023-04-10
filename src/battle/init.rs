@@ -9,7 +9,7 @@ use crate::{
     GameState,
 };
 
-use super::{battle_field::BattleField, lifecycle::LifeState, Battle, BattleQueue, BattleState};
+use super::{battle_field::BattleField, lifecycle::LifeState, BattleQueue, BattleState};
 
 pub fn get_scaling(image: Option<&Image>, tile_size: f32) -> Vec3 {
     image
@@ -76,7 +76,6 @@ pub fn setup_battle(
                         ..default()
                     },
                     RenderLayers::layer(1),
-                    Battle,
                     PickableBundle::default(),
                     Mesh2dHandle::from(
                         meshes.add(Mesh::from(shape::Quad::new(

@@ -6,6 +6,7 @@
 
 mod abilities;
 mod available_abilities;
+mod available_power_ups;
 mod battle;
 mod character;
 mod enemies;
@@ -14,6 +15,7 @@ mod utils;
 
 use abilities::AbilityPlugin;
 use available_abilities::init_available_abilities;
+use available_power_ups::init_available_power_ups;
 use battle::{battle_field::BattleFieldLayout, BattlePlugin};
 use bevy::{core_pipeline::clear_color::ClearColorConfig, prelude::*};
 use bevy_prototype_lyon::prelude::*;
@@ -49,7 +51,10 @@ fn main() {
         .add_state::<AppState>()
         .add_state::<InitState>()
         .add_startup_systems((setup, init_available_abilities))
-        .add_system(init_available_enemies.in_schedule(OnEnter(InitState::AfterAbilities)))
+        .add_systems(
+            (init_available_enemies, init_available_power_ups)
+                .in_schedule(OnEnter(InitState::AfterAbilities)),
+        )
         .add_plugin(ShapePlugin)
         .add_plugin(MainMenuPlugin)
         .add_plugin(BattlePlugin)
